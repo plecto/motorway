@@ -1,0 +1,4 @@
+
+
+class DiscoveryBase(object):
+    pass
