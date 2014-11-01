@@ -1,5 +1,5 @@
 import boto.sqs
-from motorway.contrib.amzon_sqs.utils import SQSJSONMessage
+from motorway.contrib.amazon_sqs.utils import SQSJSONMessage
 from motorway.intersection import Intersection
 
 

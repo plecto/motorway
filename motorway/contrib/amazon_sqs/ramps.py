@@ -1,4 +1,4 @@
-from motorway.contrib.amzon_sqs.utils import SQSJSONMessage
+from motorway.contrib.amazon_sqs.utils import SQSJSONMessage
 from motorway.messages import Message
 from motorway.ramp import Ramp
 import boto.sqs

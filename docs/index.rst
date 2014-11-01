@@ -11,6 +11,16 @@ Contents:
    intersections
    messages
 
+Contrib modules
+---------------
+These are add-ons which is shipped with motorway, but not a part of the "core"
+
+.. toctree::
+   :maxdepth: 2
+
+   contrib/amazon_kinesis.rst
+   contrib/amazon_sqs.rst
+
 
 .. image:: _static/explanation.png
    :width: 400px

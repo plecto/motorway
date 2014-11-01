@@ -2,7 +2,7 @@ import time
 import uuid
 from motorway.contrib.amazon_kinesis.ramps import KinesisRamp
 from motorway.contrib.amazon_kinesis.intersections import KinesisInsertIntersection
-from motorway.contrib.amzon_sqs.ramps import SQSRamp
+from motorway.contrib.amazon_sqs.ramps import SQSRamp
 from motorway.messages import Message
 from motorway.ramp import Ramp
 import random

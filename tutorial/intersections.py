@@ -1,7 +1,7 @@
 from collections import defaultdict
 import random
 import time
-from motorway.contrib.amzon_sqs.intersections import SQSInsertIntersection
+from motorway.contrib.amazon_sqs.intersections import SQSInsertIntersection
 from motorway.decorators import batch_process
 from motorway.messages import Message
 from motorway.intersection import Intersection
