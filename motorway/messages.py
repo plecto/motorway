@@ -6,15 +6,17 @@ from isodate import duration_isoformat
 
 
 class Message(object):
-    # Legacy
-    INCREASE = 0
-    DECREASE = 1
-
-    # New
+    """
+    :param ramp_unique_id: the unique message ID delivered back upon completion to the ramp
+    :param content: any json serializable content
+    :param grouping_value: String that can be used for routing messages consistently to the same receiver
+    :return:
+    """
     FAIL = -1
     SUCCESS = 0
 
-    def __init__(self, ramp_unique_id, content=None, ack_value=None, controller_queue=None, grouping_value=None, error_message=None):
+    def __init__(self, ramp_unique_id, content=None, ack_value=None, controller_queue=None, grouping_value=None,
+                 error_message=None):
         self.ramp_unique_id = ramp_unique_id
         self.content = content
         if not ack_value:
@@ -27,7 +29,16 @@ class Message(object):
 
     @classmethod
     def new(cls, message, content, grouping_value=None, error_message=None):
-        return cls(ramp_unique_id=message.ramp_unique_id, content=content, grouping_value=grouping_value, error_message=error_message)
+        """
+        Creates a new message, based on an existing message. This has the consequence that it will be tracked together
+            and the tap will not be notified until every message in the chain is properly ack'ed.
+
+        :param message: Message instance, as received by the intersection
+        :param content: Any value that can be serialized into json
+        :param grouping_value: String that can be used for routing messages consistently to the same receiver
+        """
+        return cls(ramp_unique_id=message.ramp_unique_id, content=content, grouping_value=grouping_value,
+                   error_message=error_message)
 
     @classmethod
     def from_message(cls, message, controller_queue):
@@ -65,6 +76,9 @@ class Message(object):
         })
 
     def ack(self):
+        """
+        Send a message to the controller that this message was properly processed
+        """
         self.controller_queue.send_json({
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': self.ack_value,
@@ -75,6 +89,9 @@ class Message(object):
         })
 
     def fail(self, error_message="", capture_exception=True):
+        """
+        Send a message to the controller that this message failed to process
+        """
         self.controller_queue.send_json({
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': -1,

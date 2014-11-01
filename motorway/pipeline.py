@@ -23,6 +23,16 @@ class Pipeline(object):
         self.context = zmq.Context()
 
     def definition(self):
+        """
+        Extend this method in your :class:`motorway.pipeline.Pipeline` subclass, e.g.::
+
+            class WordCountPipeline(Pipeline):
+                def definition(self):
+                    self.add_ramp(WordRamp, 'sentence')
+                    self.add_intersection(SentenceSplitIntersection, 'sentence', 'word', processes=2)
+                    self.add_intersection(WordCountIntersection, 'word', 'word_count', grouper_cls=HashRingGrouper, processes=2)
+                    self.add_intersection(AggregateIntersection, 'word_count', grouper_cls=HashRingGrouper, processes=1)
+        """
         raise NotImplementedError("You must implement a definition() on your pipeline")
 
     def _add_process(self, cls, process_instances, process_args, input_stream=None, output_stream=None, show_in_ui=True, process_start_number=0):
@@ -135,7 +145,12 @@ class Pipeline(object):
         for ramp_class_name, ramp_result_stream in self._ramp_result_streams:
             self.spawn_zmq_device(ramp_result_stream)
 
-    def run(self, web_server=True, web_server_port=8700, service_port=9100):
+    def run(self):
+        """
+        Execute the entire pipeline in several sub processes.
+
+        """
+
         logger.info("Starting Pipeline!")
 
         setproctitle("data-pipeline: main")

@@ -66,13 +66,15 @@ class Intersection(object):
             pass
 
     def process(self, message):
-        raise NotImplementedError()
+        """
+        This function is called continuously by the intersection.
 
-    def ack(self, _id):
+        :yield: :class:`motorway.messages.Message` instance
+        :param message: :class:`motorway.messages.Message` instance or :func:`list` if using
+            :func:`motorway.decorators.batch_process`
+
         """
-        Lookup ramp and call ack on it!
-        """
-        pass
+        raise NotImplementedError()
 
     @classmethod
     def run(cls, input_stream, output_stream=None, controller_stream=None):

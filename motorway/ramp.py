@@ -18,15 +18,35 @@ class Ramp(object):
         super(Ramp, self).__init__()
 
     def next(self):
+        """
+        This function is called continuously by the ramp.
+
+        .. WARNING::
+            Do not block this for a long time or make a while True loop inside it. Betwen every :func:`motorway.ramp.Ramp.next` run,
+            some essential operations are run, including receiving acks from the :class:`motorway.controller.Controller`
+
+        :yield: :class:`motorway.messages.Message` instance
+        """
         raise NotImplementedError()
 
     def __iter__(self):
         yield self.next()
 
     def success(self, _id):
+        """
+        Called when a message was successfully ack'ed through the entire pipeline.
+
+        :param _id: The id of the message that was successful
+        """
         pass
 
     def failed(self, _id):
+        """
+        Called when a message failed somewhere in the pipeline. The message might not be entirely finished processing
+        at this point and this function might be called multiple times.
+
+        :param _id: The id of the message that failed
+        """
         pass
 
     @classmethod
