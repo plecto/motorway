@@ -121,7 +121,7 @@
 		}
 		.bar-graph > span {
 			display: block;
-			float: left;
+			float: right;
 			width: 10%;
 			height: 100%;
 		}
@@ -244,8 +244,9 @@
 				var maxHistogramValue = 0;
 				that.set('lastMinutes', data['last_minutes']);
 				data['sorted_process_statistics'].forEach(function(node) {
-					Ember.$.each(node[1]['histogram'], function(i, item) {
-						var count = item['success_count'] + item['error_count'];
+					var histogram = node[1]['histogram'];
+					Ember.$.each(data['last_minutes'], function(i, minute) {
+						var count = histogram[minute]['success_count'] + histogram[minute]['error_count'];
 						if (maxHistogramValue < count) {
 							maxHistogramValue = count;
 						}
