@@ -1,6 +1,8 @@
 motorway
 ========
 
+Tests: [![Circle CI](https://circleci.com/gh/plecto/motorway.svg?style=svg)](https://circleci.com/gh/plecto/motorway)
+
 Motorway is a real-time data pipeline, much like Apache Storm - but made in Python :-) We use it over at Plecto and we're really happy with it - but we're continously developing it. The reason why we started this project was that we wanted something similar to Storm, but without the following issues:
 
 - No need to "upload" topologies (in particular, no need to stop the old topology before launching the new one)
