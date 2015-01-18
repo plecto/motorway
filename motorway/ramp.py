@@ -106,27 +106,28 @@ class Ramp(object):
             time.sleep(1)
         connections = get_connections_block('_update_connections', refresh_connection_sock)
         update_connection_sock = context.socket(zmq.PUSH)
-        update_connection_sock.connect(connections['_update_connections'][0])
+        update_connection_sock.connect(connections['_update_connections']['streams'][0])
         update_connection_sock.send_json({
             'streams': {
                 process_id: ['tcp://127.0.0.1:%s' % self.result_port]
             },
             'meta': {
                 'id': process_id,
-                'name': process_name
+                'name': process_name,
+                'grouping': None
             }
         })
 
         connections = get_connections_block('_message_ack', refresh_connection_sock)
         self.controller_sock = context.socket(zmq.PUSH)
-        self.controller_sock.connect(connections['_message_ack'][0])
+        self.controller_sock.connect(connections['_message_ack']['streams'][0])
         set_timeouts_on_socket(self.controller_sock)
 
         while True:
             try:
                 connections = refresh_connection_sock.recv_json()
                 if queue in connections:
-                    for send_conn in connections[queue]:
+                    for send_conn in connections[queue]['streams']:
                         if send_conn not in self.send_socks:
                             send_sock = context.socket(zmq.PUSH)
                             send_sock.connect(send_conn)
@@ -145,7 +146,7 @@ class Ramp(object):
                 for received_message_result in self:
                     for generated_message in received_message_result:
                         if generated_message is not None:
-                            generated_message.send(random.choice(self.send_socks.values()))  # TODO: Grouping!
+                            generated_message.send(random.choice(self.send_socks.values()), process_id)  # TODO: Grouping!
                             if self.controller_sock:
                                 generated_message.send_control_message(self.controller_sock, time_consumed=datetime.datetime.now() - start_time, process_name=process_id)
                         start_time = datetime.datetime.now()

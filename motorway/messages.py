@@ -16,7 +16,7 @@ class Message(object):
     SUCCESS = 0
 
     def __init__(self, ramp_unique_id, content=None, ack_value=None, controller_queue=None, grouping_value=None,
-                 error_message=None, process_name=None):
+                 error_message=None, process_name=None, producer_uuid=None):
         self.ramp_unique_id = ramp_unique_id
         self.content = content
         if not ack_value:
@@ -26,6 +26,7 @@ class Message(object):
         self.grouping_value = grouping_value
         self.error_message = error_message
         self.process_name = process_name
+        self.producer_uuid = producer_uuid
         self.init_time = datetime.datetime.now()
 
     @classmethod
@@ -39,7 +40,7 @@ class Message(object):
         :param grouping_value: String that can be used for routing messages consistently to the same receiver
         """
         return cls(ramp_unique_id=message.ramp_unique_id, content=content, grouping_value=grouping_value,
-                   error_message=error_message)
+                   error_message=error_message, producer_uuid=message.producer_uuid)
 
     @classmethod
     def from_message(cls, message, controller_queue, process_name=None):
@@ -51,6 +52,7 @@ class Message(object):
         :return:
         """
         message['process_name'] = process_name
+        assert 'producer_uuid' in message, "missing uuid %s" % message
         return cls(controller_queue=controller_queue, **message)
 
     def _message(self):
@@ -58,10 +60,15 @@ class Message(object):
             'content': self.content,
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': self.ack_value,
-            'grouping_value': self.grouping_value
+            'grouping_value': self.grouping_value,
+            'producer_uuid': self.producer_uuid
         }
 
-    def send(self, queue):
+    def send(self, queue, producer_uuid=None):
+        if producer_uuid and not self.producer_uuid:  # Check if provided and we didn't get one already
+            self.producer_uuid = producer_uuid
+        elif not self.producer_uuid:
+            assert self.producer_uuid
         queue.send_json(self._message())
 
     def send_control_message(self, controller_queue, time_consumed=None, process_name=None):
@@ -74,8 +81,10 @@ class Message(object):
         :param process_name: UUID of the process processing this message (as string)
         """
         content = {
-            'process_name': process_name
+            'process_name': process_name,
         }
+        if not self.producer_uuid:
+            assert self.producer_uuid
         if time_consumed:
             # Ramps provide time consumed, since we don't know the "start time" like in a intersection
             # where it's clear when the message is received and later 'acked' as the last action
@@ -83,7 +92,8 @@ class Message(object):
         controller_queue.send_json({
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': self.ack_value,
-            'content': content
+            'content': content,
+            'producer_uuid': self.producer_uuid
         })
 
     def ack(self):
@@ -96,7 +106,8 @@ class Message(object):
             'content': {
                 'process_name': self.process_name,
                 'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
-            }
+            },
+            'producer_uuid': self.producer_uuid
         })
 
     def fail(self, error_message="", capture_exception=True):
@@ -110,6 +121,7 @@ class Message(object):
                 'process_name': self.process_name,
                 'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
             },
+            'producer_uuid': self.producer_uuid,
             'error_message': error_message if not capture_exception else traceback.format_exc()
         })
 

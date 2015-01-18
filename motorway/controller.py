@@ -98,7 +98,8 @@ class ControllerIntersection(Intersection):
 
             # Create message or update with ack value
             if message.ramp_unique_id not in self.messages:  # Message just created
-                self.messages[message.ramp_unique_id] = [process, message.ack_value, datetime.datetime.now()]  # Set the new value to ack value
+                assert message.producer_uuid, "Producer UUID missing from %s" % message._message()
+                self.messages[message.ramp_unique_id] = [message.producer_uuid, message.ack_value, datetime.datetime.now()]  # Set the new value to ack value
             elif message.ack_value >= 0:  # Message processed
                 self.messages[message.ramp_unique_id][1] ^= message.ack_value  # XOR the existing value
                 # Update process information
@@ -175,7 +176,10 @@ class ControllerIntersection(Intersection):
         refresh_connection_sock.bind(self.controller_bind_address)
         set_timeouts_on_socket(refresh_connection_sock)
 
-        self.queue_processes['_update_connections'] = ['tcp://127.0.0.1:%d' % update_connection_port]
+        self.queue_processes['_update_connections'] = {
+            'streams': ['tcp://127.0.0.1:%d' % update_connection_port],
+            'grouping': None
+        }
         refresh_connection_sock.send_json(self.queue_processes)  # Initial refresh
 
         poller = zmq.Poller()
@@ -188,11 +192,16 @@ class ControllerIntersection(Intersection):
                 self.process_id_to_name[connection_updates['meta']['id']] = connection_updates['meta']['name']
                 for queue, consumers in connection_updates['streams'].items():
                     if queue not in self.queue_processes:
-                        self.queue_processes[queue] = []
+                        self.queue_processes[queue] = {
+                            'streams': [],
+                            'grouping': None
+                        }
                     for consumer in consumers:
-                        if consumer not in self.queue_processes[queue]:
-                            self.queue_processes[queue].append(consumer)
-                            if '_ramp' in queue:
+                        if consumer not in self.queue_processes[queue]['streams']:
+                            # Add to streams and update grouping TODO: Keep track of multiple groupings
+                            self.queue_processes[queue]['streams'].append(consumer)
+                            self.queue_processes[queue]['grouping'] = connection_updates['meta']['grouping']
+                            if '_ramp' in queue:  # Ramp replies
                                 self.ramp_socks[queue] = self.context.socket(zmq.PUSH)
                                 self.ramp_socks[queue].connect(consumer)
             refresh_connection_sock.send_json(self.queue_processes)
@@ -201,7 +210,10 @@ class ControllerIntersection(Intersection):
     def _process_wrapper(self):
         message_ack_sock = self.context.socket(zmq.PULL)
         message_ack_port = message_ack_sock.bind_to_random_port("tcp://*")
-        self.queue_processes['_message_ack'] = ['tcp://127.0.0.1:%s' % message_ack_port]
+        self.queue_processes['_message_ack'] = {
+            'streams': ['tcp://127.0.0.1:%s' % message_ack_port],
+            'grouping': None
+        }
         set_timeouts_on_socket(message_ack_sock)
         while True:
             self._process(message_ack_sock, None)

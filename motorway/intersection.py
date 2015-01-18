@@ -58,7 +58,7 @@ class Intersection(object):
                 try:
                     for generated_message in self.process(message):
                         if generated_message is not None and self.send_socks:
-                            generated_message.send(random.choice(self.send_socks.values()))
+                            generated_message.send(random.choice(self.send_socks.values()), self.process_uuid)
                             if controller_sock:
                                 generated_message.send_control_message(controller_sock, process_name=self.process_uuid)
                 except Exception as e:
@@ -126,27 +126,28 @@ class Intersection(object):
             time.sleep(1)
         # Register as consumer of input stream
         update_connection_sock = context.socket(zmq.PUSH)
-        update_connection_sock.connect(connections['_update_connections'][0])
+        update_connection_sock.connect(connections['_update_connections']['streams'][0])
         update_connection_sock.send_json({
             'streams': {
                 input_queue: ['tcp://127.0.0.1:%s' % self.receive_port]
             },
             'meta': {
                 'id': process_id,
-                'name': process_name
+                'name': process_name,
+                'grouping': None
             }
         })
 
         connections = get_connections_block('_message_ack', refresh_connection_sock, existing_connections=connections)
         self.controller_sock = context.socket(zmq.PUSH)
-        self.controller_sock.connect(connections['_message_ack'][0])
+        self.controller_sock.connect(connections['_message_ack']['streams'][0])
         set_timeouts_on_socket(self.controller_sock)
 
         while True:
             try:
                 connections = refresh_connection_sock.recv_json()
                 if output_queue in connections:
-                    for send_conn in connections[output_queue]:
+                    for send_conn in connections[output_queue]['streams']:
                         if send_conn not in self.send_socks:
                             send_sock = context.socket(zmq.PUSH)
                             send_sock.connect(send_conn)
