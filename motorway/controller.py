@@ -44,19 +44,23 @@ class ControllerIntersection(Intersection):
             'histogram': {minute: {'error_count': 0, 'success_count': 0}.copy() for minute in range(0, 60)}.copy()
         }.copy()
 
-    def __init__(self, stream_consumers, ramp_socks, web_server=True):
+    def __init__(self, stream_consumers, context, controller_bind_address, web_server=True):
         super(ControllerIntersection, self).__init__()
         self.stream_consumers = stream_consumers
-        self.ramp_socks = ramp_socks
+        self.ramp_socks = {}
         self.messages = {}
         self.failed_messages = {}
         self.process_statistics = {}
         self.waiting_messages = {}
+        self.queue_processes = {}
+        self.context = context
+        self.controller_bind_address = controller_bind_address
+        self.process_id_to_name = {}  # Maps UUIDs to human readable names
 
-        for stream_dict in stream_consumers.values():
-            for process in stream_dict['producers'] + stream_dict['consumers']:
-                if not process in self.process_statistics:
-                    self.process_statistics[process] = self.get_default_process_dict()
+        # for stream_dict in stream_consumers.values():
+        #     for process in stream_dict['producers'] + stream_dict['consumers']:
+        #         if not process in self.process_statistics:
+        #             self.process_statistics[process] = self.get_default_process_dict()
 
 
         if web_server:
@@ -69,7 +73,10 @@ class ControllerIntersection(Intersection):
             def json_output():
                 now = datetime.datetime.now()
                 return Response(json.dumps(dict(
-                    sorted_process_statistics=sorted(self.process_statistics.items(), key=lambda itm: itm[0]),
+                    sorted_process_statistics=sorted(
+                        [(self.process_id_to_name.get(process_id, process_id), stats) for process_id, stats in self.process_statistics.items()],
+                        key=lambda itm: itm[0]
+                    ),
                     stream_consumers=self.stream_consumers,
                     # messages=self.messages,
                     failed_messages=self.failed_messages,
@@ -90,7 +97,7 @@ class ControllerIntersection(Intersection):
                 self.process_statistics[process] = self.get_default_process_dict()
 
             # Create message or update with ack value
-            if not message.ramp_unique_id in self.messages:  # Message just created
+            if message.ramp_unique_id not in self.messages:  # Message just created
                 self.messages[message.ramp_unique_id] = [process, message.ack_value, datetime.datetime.now()]  # Set the new value to ack value
             elif message.ack_value >= 0:  # Message processed
                 self.messages[message.ramp_unique_id][1] ^= message.ack_value  # XOR the existing value
@@ -99,13 +106,14 @@ class ControllerIntersection(Intersection):
                     original_process = self.messages[message.ramp_unique_id][0]
                     self.process_statistics[original_process]['success'] += 1
                     self.process_statistics[original_process]['histogram'][datetime.datetime.now().minute]['success_count'] += 1
-                    self.success(message.ramp_unique_id, original_process.split("-")[0])
+                    self.success(message.ramp_unique_id, original_process)
                     del self.messages[message.ramp_unique_id]
             elif message.ack_value == Message.FAIL:
-                now = datetime.datetime.now()
                 if message.ramp_unique_id in self.messages:
                     process, ack_value, start_time = self.messages[message.ramp_unique_id]
                 del self.messages[message.ramp_unique_id]
+                self.process_statistics[process]['failed'] += 1
+                self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['error_count'] += 1
                 self.fail(message.ramp_unique_id, error_message=message.error_message, process=process)
             self.process_statistics[process]['processed'] += 1
 
@@ -141,46 +149,86 @@ class ControllerIntersection(Intersection):
 
     def fail(self, unique_id, process, error_message=""):
         self.failed_messages[unique_id] = (process, error_message)
-        self.process_statistics[process]['failed'] += 1
-        self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['error_count'] += 1
-
-        process_class = process.split("-")[0]
-
-        if process_class not in self.ramp_socks:
-            logging.debug("%s not in ramp_socks, probably a intersection which doesn't support feedback" % process_class)
+        if process not in self.ramp_socks:
+            logging.debug("%s not in ramp_socks, probably a intersection which doesn't support feedback. Had %s" % (process, self.ramp_socks))
         else:
-            self.ramp_socks[process_class].send_json({
+            self.ramp_socks[process].send_json({
                 'status': 'fail',
                 'id': unique_id
             })
 
-    def success(self, unique_id, process_class):
-        if process_class not in self.ramp_socks:
-            logging.debug("%s not in ramp_socks, probably a intersection which doesn't support feedback" % process_class)
+    def success(self, unique_id, process):
+        if process not in self.ramp_socks:
+            logging.debug("%s not in ramp_socks, probably a intersection which doesn't support feedback. Had %s" % (process, self.ramp_socks))
         else:
-            self.ramp_socks[process_class].send_json({
+            self.ramp_socks[process].send_json({
                 'status': 'success',
                 'id': unique_id
             })
 
+    def update_connections(self):
+        update_connection_sock = self.context.socket(zmq.PULL)
+        update_connection_port = update_connection_sock.bind_to_random_port("tcp://*")
+        set_timeouts_on_socket(update_connection_sock)
+
+        refresh_connection_sock = self.context.socket(zmq.PUB)
+        refresh_connection_sock.bind(self.controller_bind_address)
+        set_timeouts_on_socket(refresh_connection_sock)
+
+        self.queue_processes['_update_connections'] = ['tcp://127.0.0.1:%d' % update_connection_port]
+        refresh_connection_sock.send_json(self.queue_processes)  # Initial refresh
+
+        poller = zmq.Poller()
+        poller.register(update_connection_sock, zmq.POLLIN)
+
+        while True:
+            socks = dict(poller.poll(timeout=10000))
+            if socks.get(update_connection_sock) == zmq.POLLIN:
+                connection_updates = update_connection_sock.recv_json()
+                self.process_id_to_name[connection_updates['meta']['id']] = connection_updates['meta']['name']
+                for queue, consumers in connection_updates['streams'].items():
+                    if queue not in self.queue_processes:
+                        self.queue_processes[queue] = []
+                    for consumer in consumers:
+                        if consumer not in self.queue_processes[queue]:
+                            self.queue_processes[queue].append(consumer)
+                            if '_ramp' in queue:
+                                self.ramp_socks[queue] = self.context.socket(zmq.PUSH)
+                                self.ramp_socks[queue].connect(consumer)
+            refresh_connection_sock.send_json(self.queue_processes)
+            logger.debug("Announced %s", self.queue_processes)
+
+    def _process_wrapper(self):
+        message_ack_sock = self.context.socket(zmq.PULL)
+        message_ack_port = message_ack_sock.bind_to_random_port("tcp://*")
+        self.queue_processes['_message_ack'] = ['tcp://127.0.0.1:%s' % message_ack_port]
+        set_timeouts_on_socket(message_ack_sock)
+        while True:
+            self._process(message_ack_sock, None, None)
+
+
     @classmethod
-    def run(cls, input_stream, output_stream=None, stream_consumers=None, ramp_result_streams=None):
-        context = zmq.Context()
-        receive_sock = context.socket(zmq.PULL)
-        receive_sock.connect(input_stream)
-        set_timeouts_on_socket(receive_sock)
-
-        ramp_socks = {}
-        if ramp_result_streams:
-            for ramp_class_name, ramp_stream in ramp_result_streams:
-                ramp_socks[ramp_class_name] = context.socket(zmq.PUSH)
-                ramp_socks[ramp_class_name].connect(ramp_stream)
-
-        self = cls(stream_consumers, ramp_socks)
+    def run(cls, controller_bind_address, stream_consumers):
 
         setproctitle("data-pipeline: %s" % cls.__name__)
         logger.info("Running %s" % cls.__name__)
 
+        context = zmq.Context()
+
+        self = cls(
+            stream_consumers,
+            context,
+            controller_bind_address
+        )
+
+        thread_update_connections = Thread(target=self.update_connections, name="controller-update_connections")
+        thread_update_connections.start()
+
+        thread_update_stats = Thread(target=self.update, name="controller-update_stats")
+        thread_update_stats.start()
+
+        thread_process = Thread(target=self._process_wrapper, name="controller-process_acks")
+        thread_process.start()
+
         while True:
-            self._process(receive_sock, output_stream, None)
-            self.update()
+            time.sleep(1)

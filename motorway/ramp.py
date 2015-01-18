@@ -2,9 +2,10 @@ import logging
 import multiprocessing
 from setproctitle import setproctitle
 import datetime
-from motorway.utils import set_timeouts_on_socket
+import uuid
+from motorway.utils import set_timeouts_on_socket, get_connections_block
 import zmq
-from time import time as _time
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -50,28 +51,53 @@ class Ramp(object):
         pass
 
     @classmethod
-    def run(cls, queue, controller_stream=None, result_stream=None):
+    def run(cls, queue, refresh_connection_stream=None):
+
+        process_name = multiprocessing.current_process().name
+        process_uuid = str(uuid.uuid4())
+        process_id = "_ramp-%s" % process_uuid
+        logger.info("Running %s" % process_name)
+        logger.debug("%s pushing to %s" % (process_name, queue))
+        setproctitle("data-pipeline: %s" % process_name, )
+
         self = cls()
         context = zmq.Context()
 
-        send_sock = context.socket(zmq.PUSH)
-        send_sock.connect(queue)
+        refresh_connection_sock = context.socket(zmq.SUB)
+        refresh_connection_sock.connect(refresh_connection_stream)
+        refresh_connection_sock.setsockopt(zmq.SUBSCRIBE, '')  # You must subscribe to something, so this means *all*
+        set_timeouts_on_socket(refresh_connection_sock)
 
-        controller_sock = context.socket(zmq.PUSH)
-        controller_sock.connect(controller_stream)
-        set_timeouts_on_socket(controller_sock)
-
-        receive_sock = context.socket(zmq.PULL)
-        receive_sock.connect(result_stream)
-        set_timeouts_on_socket(receive_sock)
+        result_sock = context.socket(zmq.PULL)
+        result_port = result_sock.bind_to_random_port("tcp://*")
+        set_timeouts_on_socket(result_sock)
 
         message_reply_poller = zmq.Poller()
-        message_reply_poller.register(receive_sock, zmq.POLLIN)
+        message_reply_poller.register(result_sock, zmq.POLLIN)
 
-        process_name = multiprocessing.current_process().name
-        logger.info("Running %s" % process_name)
-        logger.debug("%s pushing to %s" % (process_name, result_stream))
-        setproctitle("data-pipeline: %s" % process_name, )
+        # Register as consumer of input stream
+        connections = get_connections_block('_update_connections', refresh_connection_sock)
+        update_connection_sock = context.socket(zmq.PUSH)
+        update_connection_sock.connect(connections['_update_connections'][0])
+        update_connection_sock.send_json({
+            'streams': {
+                process_id: ['tcp://127.0.0.1:%s' % result_port]
+            },
+            'meta': {
+                'id': process_id,
+                'name': process_name
+            }
+        })
+
+        connections = get_connections_block(queue, refresh_connection_sock, existing_connections=connections)
+        send_sock = context.socket(zmq.PUSH)
+        send_sock.connect(connections[queue][0])  # TODO: Multiple receivers!
+
+        connections = get_connections_block('_message_ack', refresh_connection_sock, existing_connections=connections)
+        controller_sock = context.socket(zmq.PUSH)
+        controller_sock.connect(connections['_message_ack'][0])
+        set_timeouts_on_socket(controller_sock)
+
         while True:
             start_time = datetime.datetime.now()
             for received_message_result in self:
@@ -79,14 +105,14 @@ class Ramp(object):
                     if generated_message is not None:
                         generated_message.send(send_sock)
                         if controller_sock:
-                            generated_message.send_control_message(controller_sock, time_consumed=datetime.datetime.now() - start_time)
+                            generated_message.send_control_message(controller_sock, time_consumed=datetime.datetime.now() - start_time, process_name=process_id)
                     start_time = datetime.datetime.now()
                 # After each batch send, let's see if we got replies
                 message_replies = []
                 for i in range(0, 100):
                     socks = dict(message_reply_poller.poll(timeout=0.01))
-                    if socks.get(receive_sock) == zmq.POLLIN:
-                        message_replies.append(receive_sock.recv_json())
+                    if socks.get(result_sock) == zmq.POLLIN:
+                        message_replies.append(result_sock.recv_json())
                     else:
                         break
                 for message_reply in message_replies:

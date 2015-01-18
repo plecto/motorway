@@ -16,7 +16,7 @@ class Message(object):
     SUCCESS = 0
 
     def __init__(self, ramp_unique_id, content=None, ack_value=None, controller_queue=None, grouping_value=None,
-                 error_message=None):
+                 error_message=None, process_name=None):
         self.ramp_unique_id = ramp_unique_id
         self.content = content
         if not ack_value:
@@ -25,6 +25,7 @@ class Message(object):
         self.controller_queue = controller_queue
         self.grouping_value = grouping_value
         self.error_message = error_message
+        self.process_name = process_name
         self.init_time = datetime.datetime.now()
 
     @classmethod
@@ -41,7 +42,15 @@ class Message(object):
                    error_message=error_message)
 
     @classmethod
-    def from_message(cls, message, controller_queue):
+    def from_message(cls, message, controller_queue, process_name=None):
+        """
+
+        :param message: Message dict (converted from JSON)
+        :param controller_queue:
+        :param process_name: UUID of the process processing this message (as string)
+        :return:
+        """
+        message['process_name'] = process_name
         return cls(controller_queue=controller_queue, **message)
 
     def _message(self):
@@ -55,15 +64,17 @@ class Message(object):
     def send(self, queue):
         queue.send_json(self._message())
 
-    def send_control_message(self, controller_queue, time_consumed=None):
+    def send_control_message(self, controller_queue, time_consumed=None, process_name=None):
         """
         Control messages are notifications that a new message have been created, so the controller can keep track of
         this particular message and let the ramp know once the entire tree of messages has been completed.
 
         This is called implicitly on yield Message(_id, 'message')
+
+        :param process_name: UUID of the process processing this message (as string)
         """
         content = {
-            'process_name': multiprocessing.current_process().name,
+            'process_name': process_name
         }
         if time_consumed:
             # Ramps provide time consumed, since we don't know the "start time" like in a intersection
@@ -83,7 +94,7 @@ class Message(object):
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': self.ack_value,
             'content': {
-                'process_name': multiprocessing.current_process().name,
+                'process_name': self.process_name,
                 'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
             }
         })
@@ -96,7 +107,7 @@ class Message(object):
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': -1,
             'content': {
-                'process_name': multiprocessing.current_process().name,
+                'process_name': self.process_name,
                 'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
             },
             'error_message': error_message if not capture_exception else traceback.format_exc()

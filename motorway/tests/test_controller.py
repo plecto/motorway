@@ -1,5 +1,6 @@
 from unittest import TestCase
 import datetime
+import zmq
 from motorway.controller import ControllerIntersection
 from motorway.messages import Message
 from motorway.tests.sample_pipeline import SampleWordCountPipeline
@@ -12,7 +13,8 @@ class ControllerTestCase(TestCase):
     # Utilities to test the controller
 
     def setUp(self):
-        self.controller = ControllerIntersection({}, {}, web_server=False)
+        ctx = zmq.Context()
+        self.controller = ControllerIntersection({}, ctx, "ipc://controller_test_case", web_server=False)
         self.control_messages = []
         self.controller_sock = ZMQSockMock(self.control_messages)
 
@@ -84,9 +86,10 @@ class ControllerTestCase(TestCase):
         self.assertEqual(self.controller.process_statistics['TestRamp-0']['waiting'], 0)
 
     def test_process_dict(self):
+        ctx = zmq.Context()
         pipeline = SampleWordCountPipeline()
         pipeline.definition()  # Add processes
-        self.controller = ControllerIntersection(pipeline._stream_consumers, {}, web_server=False)
+        self.controller = ControllerIntersection(pipeline._stream_consumers, ctx, "ipc://test_proecss_dict", web_server=False)
         for process in ['WordRamp-0', 'SentenceSplitIntersection-0', 'WordCountIntersection-0']:
             self.assertIn(
                 process,
