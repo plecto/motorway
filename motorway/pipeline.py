@@ -63,7 +63,6 @@ class Pipeline(object):
             processes,
             process_args=(
                 output_stream,
-                # self._discovery_backend.get_queue_uri(ramp_result_stream, 'pull'),
                 self.controller_bind_address
             ),
             output_stream=output_stream,
@@ -71,21 +70,18 @@ class Pipeline(object):
         )
 
     def add_intersection(self, intersection_class, input_stream, output_stream=None, processes=1, grouper_cls=None):
-        print input_stream, output_stream
-        for i in range(0, processes):
-            args = (
+        self._add_process(
+            intersection_class,
+            processes,
+            process_args=(
                 input_stream,
                 output_stream,
-                self.controller_bind_address
-            )
-            self._add_process(
-                intersection_class,
-                1,
-                process_args=args,
-                input_stream=input_stream,
-                output_stream=output_stream,
-                process_start_number=i
-            )
+                self.controller_bind_address,
+                grouper_cls
+            ),
+            input_stream=input_stream,
+            output_stream=output_stream,
+        )
 
     def _add_controller(self):
         self._add_process(

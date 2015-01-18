@@ -1,3 +1,4 @@
+import random
 from hash_ring import HashRing
 import zmq
 import logging
@@ -6,12 +7,19 @@ logger = logging.getLogger(__name__)
 
 
 class HashRingGrouper(object):
-    def __init__(self, number_of_destinations):
-        self.number_of_destinations = number_of_destinations
-        self.hash_ring = HashRing(range(0, number_of_destinations))
+    def __init__(self, destinations):
+        self.hash_ring = HashRing(destinations)
 
     def get_destination_for(self, value):
         return self.hash_ring.get_node(value)
+
+
+class RandomGrouper(object):
+    def __init__(self, destinations):
+        self.destinations = destinations
+
+    def get_destination_for(self, value):
+        return random.choice(self.destinations)
 
 
 class GroupingBuffer(object):

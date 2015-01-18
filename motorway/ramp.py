@@ -4,6 +4,7 @@ from setproctitle import setproctitle
 import datetime
 from threading import Thread
 import uuid
+from motorway.mixins import GrouperMixin
 from motorway.utils import set_timeouts_on_socket, get_connections_block
 import zmq
 import time
@@ -13,13 +14,14 @@ import random
 logger = logging.getLogger(__name__)
 
 
-class Ramp(object):
+class Ramp(GrouperMixin, object):
 
     fields = []
 
     def __init__(self):
         super(Ramp, self).__init__()
         self.send_socks = {}
+        self.send_grouper = None
         self.result_port = None
 
     def next(self):
@@ -132,6 +134,7 @@ class Ramp(object):
                             send_sock = context.socket(zmq.PUSH)
                             send_sock.connect(send_conn)
                             self.send_socks[send_conn] = send_sock
+                            self.send_grouper = connections[queue]['grouping']
             except zmq.Again:
                 pass
 
@@ -146,7 +149,13 @@ class Ramp(object):
                 for received_message_result in self:
                     for generated_message in received_message_result:
                         if generated_message is not None:
-                            generated_message.send(random.choice(self.send_socks.values()), process_id)  # TODO: Grouping!
+                            socket_address = self.get_grouper(self.send_grouper)(
+                                self.send_socks.keys()
+                            ).get_destination_for(generated_message.grouping_value)
+                            generated_message.send(
+                                self.send_socks[socket_address],
+                                process_id
+                            )
                             if self.controller_sock:
                                 generated_message.send_control_message(self.controller_sock, time_consumed=datetime.datetime.now() - start_time, process_name=process_id)
                         start_time = datetime.datetime.now()
