@@ -204,7 +204,7 @@ class ControllerIntersection(Intersection):
         self.queue_processes['_message_ack'] = ['tcp://127.0.0.1:%s' % message_ack_port]
         set_timeouts_on_socket(message_ack_sock)
         while True:
-            self._process(message_ack_sock, None, None)
+            self._process(message_ack_sock, None)
 
 
     @classmethod

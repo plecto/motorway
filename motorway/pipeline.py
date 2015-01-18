@@ -63,7 +63,7 @@ class Pipeline(object):
             processes,
             process_args=(
                 output_stream,
-                self._discovery_backend.get_queue_uri(ramp_result_stream, 'pull'),
+                # self._discovery_backend.get_queue_uri(ramp_result_stream, 'pull'),
                 self.controller_bind_address
             ),
             output_stream=output_stream,
