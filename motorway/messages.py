@@ -84,7 +84,7 @@ class Message(object):
             'process_name': process_name,
         }
         if not self.producer_uuid:
-            assert self.producer_uuid
+            raise Exception("Cannot send control message without producer UUID")
         if time_consumed:
             # Ramps provide time consumed, since we don't know the "start time" like in a intersection
             # where it's clear when the message is received and later 'acked' as the last action
