@@ -41,7 +41,7 @@ class ControllerIntersection(Intersection):
             'avg_time_taken': datetime.timedelta(seconds=0),
             '95_percentile': datetime.timedelta(seconds=0),
             'frequency': {}.copy(),
-            'histogram': {minute: {'error_count': 0, 'success_count': 0}.copy() for minute in range(0, 60)}.copy()
+            'histogram': {minute: {'error_count': 0, 'success_count': 0, 'timeout_count': 0}.copy() for minute in range(0, 60)}.copy()
         }.copy()
 
     def __init__(self, stream_consumers, context, controller_bind_address, web_server=True):
@@ -112,7 +112,7 @@ class ControllerIntersection(Intersection):
             elif message.ack_value == Message.FAIL:
                 if message.ramp_unique_id in self.messages:
                     process, ack_value, start_time = self.messages[message.ramp_unique_id]
-                del self.messages[message.ramp_unique_id]
+                    del self.messages[message.ramp_unique_id]
                 self.process_statistics[process]['failed'] += 1
                 self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['error_count'] += 1
                 self.fail(message.ramp_unique_id, error_message=message.error_message, process=process)
@@ -138,6 +138,7 @@ class ControllerIntersection(Intersection):
                 del self.messages[unique_id]  # This failed somewhere else in the chain and it was notificed already
             elif (now - start_time) > datetime.timedelta(minutes=30):
                 del self.messages[unique_id] # clean up
+                self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['timeout_count'] += 1
                 self.fail(unique_id, process, error_message="Message timed out")
             elif ack_value > 0:
                 waiting_messages[process] = waiting_messages.get(process, 0) + 1
