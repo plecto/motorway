@@ -11,6 +11,8 @@ class HashRingGrouper(object):
         self.hash_ring = HashRing(destinations)
 
     def get_destination_for(self, value):
+        if type(value) is int:
+            value = str(value)
         return self.hash_ring.get_node(value)
 
 
