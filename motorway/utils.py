@@ -1,6 +1,7 @@
 from json import JSONEncoder
 import datetime
 from isodate import parse_duration, duration_isoformat, datetime_isoformat
+import zmq
 
 ramp_result_stream_name = lambda ramp_class_name: "_ramp_result_%s" % ramp_class_name
 
@@ -42,3 +43,15 @@ def set_timeouts_on_socket(scket):
     scket.RCVTIMEO = 10000
     scket.SNDTIMEO = 10000
     scket.LINGER = 1000
+
+
+def get_connections_block(queue, refresh_connection_socket, limit=100, existing_connections=None):
+    i = 0
+    connections = existing_connections if existing_connections else {}
+    while queue not in connections and i < limit:
+        try:
+            connections = refresh_connection_socket.recv_json()
+        except zmq.Again:
+            pass
+        i += 1
+    return connections

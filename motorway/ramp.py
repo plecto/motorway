@@ -2,20 +2,27 @@ import logging
 import multiprocessing
 from setproctitle import setproctitle
 import datetime
-from motorway.utils import set_timeouts_on_socket
+from threading import Thread
+import uuid
+from motorway.mixins import GrouperMixin
+from motorway.utils import set_timeouts_on_socket, get_connections_block
 import zmq
-from time import time as _time
+import time
+import random
 
 
 logger = logging.getLogger(__name__)
 
 
-class Ramp(object):
+class Ramp(GrouperMixin, object):
 
     fields = []
 
     def __init__(self):
         super(Ramp, self).__init__()
+        self.send_socks = {}
+        self.send_grouper = None
+        self.result_port = None
 
     def next(self):
         """
@@ -50,49 +57,123 @@ class Ramp(object):
         pass
 
     @classmethod
-    def run(cls, queue, controller_stream=None, result_stream=None):
+    def run(cls, queue, refresh_connection_stream=None):
+
         self = cls()
-        context = zmq.Context()
-
-        send_sock = context.socket(zmq.PUSH)
-        send_sock.connect(queue)
-
-        controller_sock = context.socket(zmq.PUSH)
-        controller_sock.connect(controller_stream)
-        set_timeouts_on_socket(controller_sock)
-
-        receive_sock = context.socket(zmq.PULL)
-        receive_sock.connect(result_stream)
-        set_timeouts_on_socket(receive_sock)
-
-        message_reply_poller = zmq.Poller()
-        message_reply_poller.register(receive_sock, zmq.POLLIN)
 
         process_name = multiprocessing.current_process().name
+        process_uuid = str(uuid.uuid4())
+        process_id = "_ramp-%s" % process_uuid
         logger.info("Running %s" % process_name)
-        logger.debug("%s pushing to %s" % (process_name, result_stream))
+        logger.debug("%s pushing to %s" % (process_name, queue))
         setproctitle("data-pipeline: %s" % process_name, )
+
+        context = zmq.Context()
+
+        # Run threads
+
+        thread_update_connections = Thread(target=self.connection_thread, name="connection_thread", kwargs={
+            'refresh_connection_stream': refresh_connection_stream,
+            'context': context,
+            'queue': queue,
+            'process_id': process_id,
+            'process_name': process_name,
+        })
+        thread_update_connections.start()
+
+        thread_main = Thread(target=self.message_producer, name="message_producer", kwargs={
+            'context': context,
+            'process_id': process_id,
+        })
+        thread_main.start()
+
+        thread_results = Thread(target=self.receive_replies, name="results", kwargs={
+            'context': context,
+        })
+        thread_results.start()
+
         while True:
-            start_time = datetime.datetime.now()
-            for received_message_result in self:
-                for generated_message in received_message_result:
-                    if generated_message is not None:
-                        generated_message.send(send_sock)
-                        if controller_sock:
-                            generated_message.send_control_message(controller_sock, time_consumed=datetime.datetime.now() - start_time)
-                    start_time = datetime.datetime.now()
-                # After each batch send, let's see if we got replies
-                message_replies = []
-                for i in range(0, 100):
-                    socks = dict(message_reply_poller.poll(timeout=0.01))
-                    if socks.get(receive_sock) == zmq.POLLIN:
-                        message_replies.append(receive_sock.recv_json())
-                    else:
-                        break
-                for message_reply in message_replies:
-                    if message_reply['status'] == 'success':
-                        self.success(message_reply['id'])
-                    elif message_reply['status'] == 'fail':
-                        self.failed(message_reply['id'])
-                    else:
-                        logger.warn("Received unknown status feedback %s" % message_reply['status'])
+            time.sleep(1)
+
+    def connection_thread(self, context=None, refresh_connection_stream=None, queue=None, process_id=None,
+                          process_name=None):
+        refresh_connection_sock = context.socket(zmq.SUB)
+        refresh_connection_sock.connect(refresh_connection_stream)
+        refresh_connection_sock.setsockopt(zmq.SUBSCRIBE, '')  # You must subscribe to something, so this means *all*
+        set_timeouts_on_socket(refresh_connection_sock)
+
+        # Wait for a result port and register as consumer of input stream
+        while self.result_port is None:
+            logger.debug("Waiting for result port")
+            time.sleep(1)
+        connections = get_connections_block('_update_connections', refresh_connection_sock)
+        update_connection_sock = context.socket(zmq.PUSH)
+        update_connection_sock.connect(connections['_update_connections']['streams'][0])
+        update_connection_sock.send_json({
+            'streams': {
+                process_id: ['tcp://127.0.0.1:%s' % self.result_port]
+            },
+            'meta': {
+                'id': process_id,
+                'name': process_name,
+                'grouping': None
+            }
+        })
+
+        connections = get_connections_block('_message_ack', refresh_connection_sock)
+        self.controller_sock = context.socket(zmq.PUSH)
+        self.controller_sock.connect(connections['_message_ack']['streams'][0])
+        set_timeouts_on_socket(self.controller_sock)
+
+        while True:
+            try:
+                connections = refresh_connection_sock.recv_json()
+                if queue in connections:
+                    for send_conn in connections[queue]['streams']:
+                        if send_conn not in self.send_socks:
+                            send_sock = context.socket(zmq.PUSH)
+                            send_sock.connect(send_conn)
+                            self.send_socks[send_conn] = send_sock
+                            self.send_grouper = connections[queue]['grouping']
+            except zmq.Again:
+                pass
+
+    def message_producer(self, context=None, process_id=None):
+
+        while True:
+            if not self.send_socks:
+                logger.debug("Waiting for send_socks")
+                time.sleep(1)
+            else:
+                start_time = datetime.datetime.now()
+                for received_message_result in self:
+                    for generated_message in received_message_result:
+                        if generated_message is not None:
+                            socket_address = self.get_grouper(self.send_grouper)(
+                                self.send_socks.keys()
+                            ).get_destination_for(generated_message.grouping_value)
+                            generated_message.send(
+                                self.send_socks[socket_address],
+                                process_id
+                            )
+                            if self.controller_sock:
+                                generated_message.send_control_message(self.controller_sock, time_consumed=datetime.datetime.now() - start_time, process_name=process_id)
+                        start_time = datetime.datetime.now()
+
+    def receive_replies(self, context=None):
+        result_sock = context.socket(zmq.PULL)
+        self.result_port = result_sock.bind_to_random_port("tcp://*")
+        logger.debug("Result port is %s" % self.result_port)
+        set_timeouts_on_socket(result_sock)
+
+        while True:
+            try:
+                message_reply = result_sock.recv_json()
+                if message_reply['status'] == 'success':
+                    self.success(message_reply['id'])
+                elif message_reply['status'] == 'fail':
+                    self.failed(message_reply['id'])
+                else:
+                    logger.warn("Received unknown status feedback %s" % message_reply['status'])
+            except zmq.Again:
+                time.sleep(1)

@@ -1,5 +1,7 @@
 from unittest import TestCase
 import datetime
+import uuid
+import zmq
 from motorway.controller import ControllerIntersection
 from motorway.messages import Message
 from motorway.tests.sample_pipeline import SampleWordCountPipeline
@@ -12,7 +14,8 @@ class ControllerTestCase(TestCase):
     # Utilities to test the controller
 
     def setUp(self):
-        self.controller = ControllerIntersection({}, {}, web_server=False)
+        ctx = zmq.Context()
+        self.controller = ControllerIntersection({}, ctx, "ipc://controller_test_case", web_server=False)
         self.control_messages = []
         self.controller_sock = ZMQSockMock(self.control_messages)
 
@@ -28,85 +31,72 @@ class ControllerTestCase(TestCase):
     # Tests
 
     def test_histogram_success(self):
+        ramp_uuid = str(uuid.uuid4())
         with freeze_time("2014-01-10 12:00:01"):
-            with override_process_name("TestRamp-0"):
-                msg_in_ramp = Message(1337, "split this string please")
-                msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2))
+            msg_in_ramp = Message(1337, "split this string please", producer_uuid=ramp_uuid)
+            msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid)
             self.run_controller_process_method()
             self.controller.update()
-            with override_process_name("TestIntersection-0"):
-                msg_in_intersection = Message.from_message(msg_in_ramp._message(), self.controller_sock)
-                msg_in_intersection.ack()
-            self.run_controller_process_method()
-            self.controller.update()
-        self.assertEqual(self.controller.process_statistics['TestRamp-0']['histogram'][0]['success_count'], 1)
-        with freeze_time("2014-01-10 12:59:01"):
-            self.controller.update()
-        self.assertEqual(self.controller.process_statistics['TestRamp-0']['histogram'][0]['success_count'], 0)
-
-    def test_histogram_error(self):
-        with freeze_time("2014-01-10 12:00:01"):
-            with override_process_name("TestRamp-0"):
-                msg_in_ramp = Message(1337, "split this string please")
-                msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2))
-            self.run_controller_process_method()
-            self.controller.update()
-            with override_process_name("TestIntersection-0"):
-                msg_in_intersection = Message.from_message(msg_in_ramp._message(), self.controller_sock)
-                msg_in_intersection.fail("some error message", False)
-            self.run_controller_process_method()
-            self.controller.update()
-        self.assertEqual(self.controller.process_statistics['TestRamp-0']['histogram'][0]['error_count'], 1)
-        with freeze_time("2014-01-10 12:59:01"):
-            self.controller.update()
-        self.assertEqual(self.controller.process_statistics['TestRamp-0']['histogram'][0]['error_count'], 0)
-
-    def test_frequency(self):
-        msg = Message(1337, "split this string please")
-        with override_process_name("TestRamp-0"):
-            msg.send_control_message(self.controller_sock, datetime.timedelta(seconds=2))
-        self.run_controller_process_method()
-        self.controller.update()
-        self.assertEqual(self.controller.process_statistics['TestRamp-0']['frequency'][2], 1)
-
-    def test_waiting(self):
-        msg_in_ramp = Message(1337, "split this string please")
-        with override_process_name("TestRamp-0"):
-            msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2))
-        self.run_controller_process_method()
-        self.controller.update()
-        self.assertEqual(self.controller.process_statistics['TestRamp-0']['waiting'], 1)
-        with override_process_name("TestIntersection-0"):
             msg_in_intersection = Message.from_message(msg_in_ramp._message(), self.controller_sock)
             msg_in_intersection.ack()
-        self.run_controller_process_method()
-        self.controller.update()
-        self.assertEqual(self.controller.process_statistics['TestRamp-0']['waiting'], 0)
-
-    def test_process_dict(self):
-        pipeline = SampleWordCountPipeline()
-        pipeline.definition()  # Add processes
-        self.controller = ControllerIntersection(pipeline._stream_consumers, {}, web_server=False)
-        for process in ['WordRamp-0', 'SentenceSplitIntersection-0', 'WordCountIntersection-0']:
-            self.assertIn(
-                process,
-                self.controller.process_statistics,
-                msg="%s was not found in controller.process_statistics" % process
-            )
-
-    def test_message_timeout(self):
-        with freeze_time("2014-01-10 12:00:01"):
-            with override_process_name("TestRamp-0"):
-                msg_in_ramp = Message(1337, "split this string please")
-                msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2))
             self.run_controller_process_method()
             self.controller.update()
-        self.assertEqual(self.controller.process_statistics['TestRamp-0']['waiting'], 1)
+        self.assertEqual(self.controller.process_statistics[ramp_uuid]['histogram'][0]['success_count'], 1)
         with freeze_time("2014-01-10 12:59:01"):
             self.controller.update()
-            self.assertEqual(self.controller.process_statistics['TestRamp-0']['waiting'], 0)
+        self.assertEqual(self.controller.process_statistics[ramp_uuid]['histogram'][0]['success_count'], 0)
+
+    def test_histogram_error(self):
+        ramp_uuid = str(uuid.uuid4())
+        with freeze_time("2014-01-10 12:00:01"):
+            msg_in_ramp = Message(1337, "split this string please", producer_uuid=ramp_uuid)
+            msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid)
             self.run_controller_process_method()
-            self.assertEqual(self.controller.process_statistics['TestRamp-0']['histogram'][59]['error_count'], 1)
+            self.controller.update()
+            msg_in_intersection = Message.from_message(msg_in_ramp._message(), self.controller_sock)
+            msg_in_intersection.fail("some error message", False)
+            self.run_controller_process_method()
+            self.controller.update()
+        self.assertEqual(self.controller.process_statistics[ramp_uuid]['histogram'][0]['error_count'], 1)
+        with freeze_time("2014-01-10 12:59:01"):
+            self.controller.update()
+        self.assertEqual(self.controller.process_statistics[ramp_uuid]['histogram'][0]['error_count'], 0)
+
+    def test_frequency(self):
+        ramp_uuid = str(uuid.uuid4())
+        msg = Message(1337, "split this string please", producer_uuid=ramp_uuid)
+        msg.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid)
+        self.run_controller_process_method()
+        self.controller.update()
+        self.assertEqual(self.controller.process_statistics[ramp_uuid]['frequency'][2], 1)
+
+    def test_waiting(self):
+        ramp_uuid = str(uuid.uuid4())
+        msg_in_ramp = Message(1337, "split this string please", producer_uuid=ramp_uuid)
+        msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid)
+        self.run_controller_process_method()
+        self.controller.update()
+        self.assertEqual(self.controller.process_statistics[ramp_uuid]['waiting'], 1)
+        intersection_uuid = str(uuid.uuid4())
+        msg_in_intersection = Message.from_message(msg_in_ramp._message(), self.controller_sock, process_name=intersection_uuid)
+        msg_in_intersection.ack()
+        self.run_controller_process_method()
+        self.controller.update()
+        self.assertEqual(self.controller.process_statistics[ramp_uuid]['waiting'], 0)
+
+    def test_message_timeout(self):
+        ramp_uuid = str(uuid.uuid4())
+        with freeze_time("2014-01-10 12:00:01"):
+            msg_in_ramp = Message(1337, "split this string please", producer_uuid=ramp_uuid)
+            msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid)
+            self.run_controller_process_method()
+            self.controller.update()
+        self.assertEqual(self.controller.process_statistics[ramp_uuid]['waiting'], 1)
+        with freeze_time("2014-01-10 12:59:01"):
+            self.controller.update()
+            self.assertEqual(self.controller.process_statistics[ramp_uuid]['waiting'], 0)
+            self.run_controller_process_method()
+            self.assertEqual(self.controller.process_statistics[ramp_uuid]['histogram'][59]['timeout_count'], 1)
 
 
 

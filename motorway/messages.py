@@ -16,7 +16,7 @@ class Message(object):
     SUCCESS = 0
 
     def __init__(self, ramp_unique_id, content=None, ack_value=None, controller_queue=None, grouping_value=None,
-                 error_message=None):
+                 error_message=None, process_name=None, producer_uuid=None):
         self.ramp_unique_id = ramp_unique_id
         self.content = content
         if not ack_value:
@@ -25,6 +25,8 @@ class Message(object):
         self.controller_queue = controller_queue
         self.grouping_value = grouping_value
         self.error_message = error_message
+        self.process_name = process_name
+        self.producer_uuid = producer_uuid
         self.init_time = datetime.datetime.now()
 
     @classmethod
@@ -38,10 +40,19 @@ class Message(object):
         :param grouping_value: String that can be used for routing messages consistently to the same receiver
         """
         return cls(ramp_unique_id=message.ramp_unique_id, content=content, grouping_value=grouping_value,
-                   error_message=error_message)
+                   error_message=error_message, producer_uuid=message.producer_uuid)
 
     @classmethod
-    def from_message(cls, message, controller_queue):
+    def from_message(cls, message, controller_queue, process_name=None):
+        """
+
+        :param message: Message dict (converted from JSON)
+        :param controller_queue:
+        :param process_name: UUID of the process processing this message (as string)
+        :return:
+        """
+        message['process_name'] = process_name
+        assert 'producer_uuid' in message, "missing uuid %s" % message
         return cls(controller_queue=controller_queue, **message)
 
     def _message(self):
@@ -49,22 +60,31 @@ class Message(object):
             'content': self.content,
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': self.ack_value,
-            'grouping_value': self.grouping_value
+            'grouping_value': self.grouping_value,
+            'producer_uuid': self.producer_uuid
         }
 
-    def send(self, queue):
+    def send(self, queue, producer_uuid=None):
+        if producer_uuid and not self.producer_uuid:  # Check if provided and we didn't get one already
+            self.producer_uuid = producer_uuid
+        elif not self.producer_uuid:
+            assert self.producer_uuid
         queue.send_json(self._message())
 
-    def send_control_message(self, controller_queue, time_consumed=None):
+    def send_control_message(self, controller_queue, time_consumed=None, process_name=None):
         """
         Control messages are notifications that a new message have been created, so the controller can keep track of
         this particular message and let the ramp know once the entire tree of messages has been completed.
 
         This is called implicitly on yield Message(_id, 'message')
+
+        :param process_name: UUID of the process processing this message (as string)
         """
         content = {
-            'process_name': multiprocessing.current_process().name,
+            'process_name': process_name,
         }
+        if not self.producer_uuid:
+            raise Exception("Cannot send control message without producer UUID")
         if time_consumed:
             # Ramps provide time consumed, since we don't know the "start time" like in a intersection
             # where it's clear when the message is received and later 'acked' as the last action
@@ -72,7 +92,8 @@ class Message(object):
         controller_queue.send_json({
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': self.ack_value,
-            'content': content
+            'content': content,
+            'producer_uuid': self.producer_uuid
         })
 
     def ack(self):
@@ -83,9 +104,10 @@ class Message(object):
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': self.ack_value,
             'content': {
-                'process_name': multiprocessing.current_process().name,
+                'process_name': self.process_name,
                 'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
-            }
+            },
+            'producer_uuid': self.producer_uuid
         })
 
     def fail(self, error_message="", capture_exception=True):
@@ -96,9 +118,10 @@ class Message(object):
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': -1,
             'content': {
-                'process_name': multiprocessing.current_process().name,
+                'process_name': self.process_name,
                 'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
             },
+            'producer_uuid': self.producer_uuid,
             'error_message': error_message if not capture_exception else traceback.format_exc()
         })
 
