@@ -149,6 +149,11 @@ class ControllerIntersection(Intersection):
             self.process_statistics[process]['histogram'][(now + datetime.timedelta(minutes=1)).minute] = self.get_default_process_dict()['histogram'][0]  # reset next minute
             self.process_statistics[process]['waiting'] = self.waiting_messages.get(process, 0)
 
+    def _update_wrapper(self):
+        while True:
+            self.update()
+            time.sleep(1)
+
     def fail(self, unique_id, process, error_message=""):
         self.failed_messages[unique_id] = (process, error_message)
         if process not in self.ramp_socks:
@@ -237,7 +242,7 @@ class ControllerIntersection(Intersection):
         thread_update_connections = Thread(target=self.update_connections, name="controller-update_connections")
         thread_update_connections.start()
 
-        thread_update_stats = Thread(target=self.update, name="controller-update_stats")
+        thread_update_stats = Thread(target=self._update_wrapper, name="controller-update_stats")
         thread_update_stats.start()
 
         thread_process = Thread(target=self._process_wrapper, name="controller-process_acks")
