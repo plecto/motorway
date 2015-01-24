@@ -49,7 +49,7 @@ class WordCountPipeline(Pipeline):
         self.add_ramp(WordRamp, 'sentence')
         self.add_intersection(SentenceSplitIntersection, 'sentence', 'word', processes=2)
         self.add_intersection(WordCountIntersection, 'word', 'word_count', grouper_cls=HashRingGrouper, processes=2)
-        self.add_intersection(AggregateIntersection, 'word_count', grouper_cls=HashRingGrouper, processes=1)
+        self.add_intersection(AggregateIntersection, 'word_count', processes=1)
 
 
 WordCountPipeline().run()
