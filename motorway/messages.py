@@ -16,7 +16,8 @@ class Message(object):
     SUCCESS = 0
 
     def __init__(self, ramp_unique_id, content=None, ack_value=None, controller_queue=None, grouping_value=None,
-                 error_message=None, process_name=None, producer_uuid=None):
+                 error_message=None, process_name=None, producer_uuid=None, destination_endpoint=None,
+                 destination_uuid=None):
         self.ramp_unique_id = ramp_unique_id
         self.content = content
         if not ack_value:
@@ -27,6 +28,8 @@ class Message(object):
         self.error_message = error_message
         self.process_name = process_name
         self.producer_uuid = producer_uuid
+        self.destination_endpoint = destination_endpoint
+        self.destination_uuid = destination_uuid
         self.init_time = datetime.datetime.now()
 
     @classmethod
@@ -71,7 +74,8 @@ class Message(object):
             assert self.producer_uuid
         queue.send_json(self._message())
 
-    def send_control_message(self, controller_queue, time_consumed=None, process_name=None):
+    def send_control_message(self, controller_queue, time_consumed=None, process_name=None, destination_endpoint=None,
+                             destination_uuid=None):
         """
         Control messages are notifications that a new message have been created, so the controller can keep track of
         this particular message and let the ramp know once the entire tree of messages has been completed.
@@ -93,7 +97,9 @@ class Message(object):
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': self.ack_value,
             'content': content,
-            'producer_uuid': self.producer_uuid
+            'producer_uuid': self.producer_uuid,
+            'destination_endpoint': destination_endpoint,
+            'destination_uuid': destination_uuid
         })
 
     def ack(self):
@@ -107,7 +113,8 @@ class Message(object):
                 'process_name': self.process_name,
                 'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
             },
-            'producer_uuid': self.producer_uuid
+            'producer_uuid': self.producer_uuid,
+            'destination_uuid': self.producer_uuid
         })
 
     def fail(self, error_message="", capture_exception=True):
@@ -122,6 +129,7 @@ class Message(object):
                 'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
             },
             'producer_uuid': self.producer_uuid,
+            'destination_uuid': self.producer_uuid,
             'error_message': error_message if not capture_exception else traceback.format_exc()
         })
 

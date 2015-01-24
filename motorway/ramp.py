@@ -157,7 +157,12 @@ class Ramp(GrouperMixin, object):
                                 process_id
                             )
                             if self.controller_sock:
-                                generated_message.send_control_message(self.controller_sock, time_consumed=datetime.datetime.now() - start_time, process_name=process_id)
+                                generated_message.send_control_message(
+                                    self.controller_sock,
+                                    time_consumed=datetime.datetime.now() - start_time,
+                                    process_name=process_id,
+                                    destination_endpoint=socket_address
+                                )
                         start_time = datetime.datetime.now()
 
     def receive_replies(self, context=None):

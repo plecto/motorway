@@ -68,7 +68,11 @@ class Intersection(GrouperMixin, object):
                                 self.process_uuid
                             )
                             if controller_sock:
-                                generated_message.send_control_message(controller_sock, process_name=self.process_uuid)
+                                generated_message.send_control_message(
+                                    controller_sock,
+                                    process_name=self.process_uuid,
+                                    destination_endpoint=socket_address
+                                )
                 except Exception as e:
                     logger.error(str(e), exc_info=True)
                     if isinstance(message, list):

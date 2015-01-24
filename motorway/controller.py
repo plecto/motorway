@@ -56,6 +56,7 @@ class ControllerIntersection(Intersection):
         self.context = context
         self.controller_bind_address = controller_bind_address
         self.process_id_to_name = {}  # Maps UUIDs to human readable names
+        self.process_address_to_uuid = {}  # Maps tcp endpoints to human readable names
 
         # for stream_dict in stream_consumers.values():
         #     for process in stream_dict['producers'] + stream_dict['consumers']:
@@ -92,14 +93,27 @@ class ControllerIntersection(Intersection):
     @batch_process(wait=1, limit=500)
     def process(self, messages):
         for message in messages:
-            process = message.content['process_name']
-            if process not in self.process_statistics:
-                self.process_statistics[process] = self.get_default_process_dict()
+            original_process = message.producer_uuid
+            if original_process not in self.process_statistics:
+                self.process_statistics[original_process] = self.get_default_process_dict()
+
+            current_process = message.content['process_name']
+            if current_process not in self.process_statistics:
+                self.process_statistics[current_process] = self.get_default_process_dict()
+
+            destination_process = message.destination_uuid or self.process_address_to_uuid[message.destination_endpoint]
+            if destination_process not in self.process_statistics:
+                self.process_statistics[destination_process] = self.get_default_process_dict()
 
             # Create message or update with ack value
             if message.ramp_unique_id not in self.messages:  # Message just created
                 assert message.producer_uuid, "Producer UUID missing from %s" % message._message()
-                self.messages[message.ramp_unique_id] = [message.producer_uuid, message.ack_value, datetime.datetime.now()]  # Set the new value to ack value
+                self.messages[message.ramp_unique_id] = [
+                    message.producer_uuid,
+                    message.ack_value,
+                    datetime.datetime.now(),
+                    destination_process
+                ]  # Set the new value to ack value
             elif message.ack_value >= 0:  # Message processed
                 self.messages[message.ramp_unique_id][1] ^= message.ack_value  # XOR the existing value
                 # Update process information
@@ -109,23 +123,26 @@ class ControllerIntersection(Intersection):
                     self.process_statistics[original_process]['histogram'][datetime.datetime.now().minute]['success_count'] += 1
                     self.success(message.ramp_unique_id, original_process)
                     del self.messages[message.ramp_unique_id]
+                else:  # Still not finished - update destination!
+                    if destination_process != original_process:
+                        self.messages[message.ramp_unique_id][3] = destination_process  # Update destination so we can show what is waiting for this process!
             elif message.ack_value == Message.FAIL:
                 if message.ramp_unique_id in self.messages:
-                    process, ack_value, start_time = self.messages[message.ramp_unique_id]
+                    original_process, ack_value, start_time, destination_process = self.messages[message.ramp_unique_id]
                     del self.messages[message.ramp_unique_id]
-                self.process_statistics[process]['failed'] += 1
-                self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['error_count'] += 1
-                self.fail(message.ramp_unique_id, error_message=message.error_message, process=process)
-            self.process_statistics[process]['processed'] += 1
+                self.process_statistics[original_process]['failed'] += 1
+                self.process_statistics[original_process]['histogram'][datetime.datetime.now().minute]['error_count'] += 1
+                self.fail(message.ramp_unique_id, error_message=message.error_message, process=destination_process)
+            self.process_statistics[original_process]['processed'] += 1
 
             # Update statistics
             if 'duration' in message.content:
                 time_taken = parse_duration(message.content['duration'])
                 rounded_seconds = round(time_taken.total_seconds(), 0)
-                self.process_statistics[process]['time_taken'] += time_taken
-                self.process_statistics[process]['frequency'][rounded_seconds] = self.process_statistics[process]['frequency'].get(rounded_seconds, 0) + 1
-                self.process_statistics[process]['95_percentile'] = datetime.timedelta(seconds=percentile_from_dict(self.process_statistics[process]['frequency'], 95))
-                self.process_statistics[process]['avg_time_taken'] = self.process_statistics[process]['time_taken'] / sum(self.process_statistics[process]['frequency'].values())
+                self.process_statistics[current_process]['time_taken'] += time_taken
+                self.process_statistics[current_process]['frequency'][rounded_seconds] = self.process_statistics[current_process]['frequency'].get(rounded_seconds, 0) + 1
+                self.process_statistics[current_process]['95_percentile'] = datetime.timedelta(seconds=percentile_from_dict(self.process_statistics[current_process]['frequency'], 95))
+                self.process_statistics[current_process]['avg_time_taken'] = self.process_statistics[current_process]['time_taken'] / sum(self.process_statistics[current_process]['frequency'].values())
         yield
 
     def update(self):
@@ -133,7 +150,7 @@ class ControllerIntersection(Intersection):
         # Check message status
         waiting_messages = {}
         for unique_id, lst in self.messages.items():
-            process, ack_value, start_time = lst
+            original_process, ack_value, start_time, process = lst
             if unique_id in self.failed_messages:
                 del self.messages[unique_id]  # This failed somewhere else in the chain and it was notificed already
             elif (now - start_time) > datetime.timedelta(minutes=30):
@@ -204,6 +221,7 @@ class ControllerIntersection(Intersection):
                         }
                     for consumer in consumers:
                         if consumer not in self.queue_processes[queue]['streams']:
+                            self.process_address_to_uuid[consumer] = connection_updates['meta']['id']
                             # Add to streams and update grouping TODO: Keep track of multiple groupings
                             self.queue_processes[queue]['streams'].append(consumer)
                             self.queue_processes[queue]['grouping'] = connection_updates['meta']['grouping']

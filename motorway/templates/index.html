@@ -138,6 +138,10 @@
 		.bar-graph .error {
 			background: #87190c;
 		}
+
+		.bar-graph .timeout {
+			background: yellow;
+		}
 	</style>
 </head>
 <body>
@@ -165,6 +169,7 @@
 				<span class="blank" {{bind-attr style=bar.blank_style}}></span>
 				<span class="success" {{bind-attr style=bar.success_style}}>{{unbound bar.success_count}}</span>
 				<span class="error" {{bind-attr style=bar.error_style}}>{{unbound bar.error_count}}</span>
+				<span class="timeout" {{bind-attr style=bar.timeout_style}}>{{unbound bar.timeout_count}}</span>
 			</span>
 		{{/each}}
 	</script>
@@ -246,7 +251,7 @@
 				data['sorted_process_statistics'].forEach(function(node) {
 					var histogram = node[1]['histogram'];
 					Ember.$.each(data['last_minutes'], function(i, minute) {
-						var count = histogram[minute]['success_count'] + histogram[minute]['error_count'];
+						var count = histogram[minute]['success_count'] + histogram[minute]['error_count'] + histogram[minute]['timeout_count'];
 						if (maxHistogramValue < count) {
 							maxHistogramValue = count;
 						}
@@ -267,9 +272,11 @@
 						if (maxHistogramValue > 0) {
 							histogram[i]['success_percentage'] = (item['success_count'] / maxHistogramValue) * 100;
 							histogram[i]['error_percentage'] = (item['error_count'] / maxHistogramValue) * 100;
+							histogram[i]['timeout_percentage'] = (item['timeout_count'] / maxHistogramValue) * 100;
 						} else {
 							histogram[i]['success_percentage'] = 0;
 							histogram[i]['error_percentage'] = 0;
+							histogram[i]['timeout_percentage'] = 0;
 						}
 					});
 					node.set('histogram', histogram)
@@ -347,9 +354,11 @@
 				return {
 					'success_count': item['success_count'],
 					'error_count': item['error_count'],
+					'timeout_count': item['timeout_count'],
 					'blank_style': 'height: '+parseInt(100-parseInt(item.success_percentage)-parseInt(item.error_percentage))+'%;',
 					'success_style': 'height: '+parseInt(item.success_percentage)+'%;',
-					'error_style': 'height: '+parseInt(item.error_percentage)+'%;'
+					'error_style': 'height: '+parseInt(item.error_percentage)+'%;',
+					'timeout_style': 'height: '+parseInt(item.timeout_percentage)+'%;'
 				}
 			});
 		}.property('data')

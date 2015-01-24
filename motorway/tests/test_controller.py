@@ -32,9 +32,10 @@ class ControllerTestCase(TestCase):
 
     def test_histogram_success(self):
         ramp_uuid = str(uuid.uuid4())
+        intersection_uuid = str(uuid.uuid4())
         with freeze_time("2014-01-10 12:00:01"):
             msg_in_ramp = Message(1337, "split this string please", producer_uuid=ramp_uuid)
-            msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid)
+            msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid, destination_uuid=intersection_uuid)
             self.run_controller_process_method()
             self.controller.update()
             msg_in_intersection = Message.from_message(msg_in_ramp._message(), self.controller_sock)
@@ -48,9 +49,10 @@ class ControllerTestCase(TestCase):
 
     def test_histogram_error(self):
         ramp_uuid = str(uuid.uuid4())
+        intersection_uuid = str(uuid.uuid4())
         with freeze_time("2014-01-10 12:00:01"):
             msg_in_ramp = Message(1337, "split this string please", producer_uuid=ramp_uuid)
-            msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid)
+            msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid, destination_uuid=intersection_uuid)
             self.run_controller_process_method()
             self.controller.update()
             msg_in_intersection = Message.from_message(msg_in_ramp._message(), self.controller_sock)
@@ -64,39 +66,46 @@ class ControllerTestCase(TestCase):
 
     def test_frequency(self):
         ramp_uuid = str(uuid.uuid4())
+        intersection_uuid = str(uuid.uuid4())
         msg = Message(1337, "split this string please", producer_uuid=ramp_uuid)
-        msg.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid)
+        msg.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid, destination_uuid=intersection_uuid)
         self.run_controller_process_method()
         self.controller.update()
         self.assertEqual(self.controller.process_statistics[ramp_uuid]['frequency'][2], 1)
 
     def test_waiting(self):
         ramp_uuid = str(uuid.uuid4())
+        intersection_uuid = str(uuid.uuid4())
         msg_in_ramp = Message(1337, "split this string please", producer_uuid=ramp_uuid)
-        msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid)
+        msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid, destination_uuid=intersection_uuid)
         self.run_controller_process_method()
         self.controller.update()
-        self.assertEqual(self.controller.process_statistics[ramp_uuid]['waiting'], 1)
-        intersection_uuid = str(uuid.uuid4())
+        self.assertEqual(self.controller.process_statistics[ramp_uuid]['waiting'], 0)
+        self.assertEqual(self.controller.process_statistics[intersection_uuid]['waiting'], 1)
         msg_in_intersection = Message.from_message(msg_in_ramp._message(), self.controller_sock, process_name=intersection_uuid)
         msg_in_intersection.ack()
         self.run_controller_process_method()
         self.controller.update()
         self.assertEqual(self.controller.process_statistics[ramp_uuid]['waiting'], 0)
+        self.assertEqual(self.controller.process_statistics[intersection_uuid]['waiting'], 0)
 
     def test_message_timeout(self):
         ramp_uuid = str(uuid.uuid4())
+        intersection_uuid = str(uuid.uuid4())
         with freeze_time("2014-01-10 12:00:01"):
             msg_in_ramp = Message(1337, "split this string please", producer_uuid=ramp_uuid)
-            msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid)
+            msg_in_ramp.send_control_message(self.controller_sock, datetime.timedelta(seconds=2), process_name=ramp_uuid, destination_uuid=intersection_uuid)
             self.run_controller_process_method()
             self.controller.update()
-        self.assertEqual(self.controller.process_statistics[ramp_uuid]['waiting'], 1)
+        self.assertEqual(self.controller.process_statistics[ramp_uuid]['waiting'], 0)
+        self.assertEqual(self.controller.process_statistics[intersection_uuid]['waiting'], 1)
         with freeze_time("2014-01-10 12:59:01"):
             self.controller.update()
             self.assertEqual(self.controller.process_statistics[ramp_uuid]['waiting'], 0)
+            self.assertEqual(self.controller.process_statistics[intersection_uuid]['waiting'], 0)
             self.run_controller_process_method()
-            self.assertEqual(self.controller.process_statistics[ramp_uuid]['histogram'][59]['timeout_count'], 1)
+            self.assertEqual(self.controller.process_statistics[ramp_uuid]['histogram'][59]['timeout_count'], 0)
+            self.assertEqual(self.controller.process_statistics[intersection_uuid]['histogram'][59]['timeout_count'], 1)
 
 
 
