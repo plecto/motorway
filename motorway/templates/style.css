@@ -1,0 +1,219 @@
+/*
+ * CSS reset
+ * * * * * * * * * * * * * * * * * *
+*/
+
+html {
+	box-sizing: border-box;
+}
+*, *:before, *:after {
+	box-sizing: inherit;
+}
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
+p,h1,h2,h3,h4,h5,h6 { margin: 0; padding: 0; font-weight: 400; }
+body {
+	font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+	background: #000;
+	color: #fff;
+	color: rgba(255,255,255,0.8);
+	font-size: 10px;
+	line-height: 1;
+}
+
+
+/*
+ * Elements
+ * * * * * * * * * * * * * * * * * *
+*/
+
+#disconnected-message {
+	display: none;
+	position: relative;
+	z-index: 800;
+}
+
+.disconnected-inner {
+	position: fixed;
+	z-index: 50;
+	top: 50%;
+	left: 50%;
+	width: 600px;
+	height: 80px;
+	margin: -40px 0 0 -300px;
+	border: 10px solid #a41b0d;
+	background: #87190c;
+	color: #ecd0cd;
+	font-weight: 600;
+	font-size: 40px;
+	text-align: center;
+	line-height: 60px;
+}
+
+#disconnected-message:before {
+	content: '';
+	position: fixed;
+	z-index: 5;
+	background: rgba(40,0,0,0.5);
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+}
+
+body.disconnected #disconnected-message {
+	display: block;
+}
+
+#pulse {
+	position: fixed;
+	z-index: 1000;
+	left: 10px;
+	top: 10px;
+	background: #16314f;
+	width: 10px;
+	height: 10px;
+	border-radius: 100%;
+	display: none;
+}
+.disconnected #pulse {
+	background: #a41b0d;
+	width: 20px;
+	height: 20px;
+}
+
+
+/*
+ * Nodes
+ * * * * * * * * * * * * * * * * * *
+*/
+
+#container,
+.pipeline,
+.nodes-container {
+	width: 100%;
+	height: 100%;
+}
+
+.nodes-container {
+	padding: 5px 0;
+}
+
+.node {
+	float: left;
+	width: 25%;
+	height: 20%;
+	padding: 5px;
+}
+.node-inner {
+	height: 100%;
+	background: rgba(100,100,100,0.3);
+	position: relative;
+	border-radius: 5px;
+	overflow: hidden;
+}
+.node-content {
+	position: relative;
+	height: 100%;
+	z-index: 10;
+	padding: 15px;
+}
+
+.node-icon {
+	float: left;
+	font-size: 260%;
+	margin: 0;
+	color: rgba(0,0,0,0.8);
+	background: rgba(255,255,255,0.7);
+	text-align: center;
+	padding: 6px;
+	width: 40px;
+	height: 40px;
+	border-radius: 100%;
+}
+.node-name {
+	font-size: 200%;
+	line-height: 0.8;
+	font-weight: 400;
+	color: rgba(255,255,255,0.7);
+	margin: 4px 0 0 55px;
+}
+.node-type {
+	display: block;
+	font-size: 140%;
+	font-weight: 300;
+	color: rgba(255,255,255,0.3);
+	margin: 3px 0 0 55px;
+}
+
+.node-time {
+	position: absolute;
+	top: 50%;
+	right: 15px;
+	text-align: right;
+}
+.node-time-percentile {
+	font-size: 260%;
+}
+.node-time-average {
+	margin: 5px 0 0 0;
+	font-size: 180%;
+	color: rgba(255,255,255,0.4);
+}
+
+.node-waiting {
+	position: absolute;
+	top: 50%;
+	left: 15px;
+	font-size: 520%;
+}
+
+
+/*
+ * Bar graph
+ * * * * * * * * * * * * * * * * * *
+*/
+
+.node-graph {
+	position: absolute;
+	z-index: 1;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 100%;
+}
+.node-graph-bar {
+	display: block;
+	float: right;
+	width: 10%;
+	height: 100%;
+}
+.node-graph-bar-part {
+	display: block;
+	color: rgba(255,255,255,0.1);
+	text-align: center;
+	font-size: 100%;
+	line-height: 200%;
+	overflow: hidden;
+}
+.node-graph-success {
+	background: rgba(0,255,150,0.05);
+}
+.node-graph-error {
+	background: rgba(255,0,20,0.1);
+}
+
+
+/*
+ * Circle
+ * * * * * * * * * * * * * * * * * *
+*/
+
+.node-circle {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	margin: 0;
+	border-radius: 100%;
+	background: #fff;
+	opacity: 0.1;
+}
