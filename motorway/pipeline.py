@@ -1,12 +1,9 @@
-from multiprocessing import Queue
 from multiprocessing import Process
 from setproctitle import setproctitle
 import time
 from motorway.controller import ControllerIntersection
 from motorway.discovery.local import LocalDiscovery
-from motorway.grouping import GroupingBuffer, HashRingGrouper
 from motorway.utils import ramp_result_stream_name
-from motorway.zmq_device import ZMQDevice
 import zmq
 import logging
 
