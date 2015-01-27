@@ -5,6 +5,7 @@ from setproctitle import setproctitle
 from threading import Thread
 import time
 import datetime
+import uuid
 from motorway.decorators import batch_process
 from motorway.messages import Message
 from motorway.intersection import Intersection
@@ -58,37 +59,6 @@ class ControllerIntersection(Intersection):
         self.process_id_to_name = {}  # Maps UUIDs to human readable names
         self.process_address_to_uuid = {}  # Maps tcp endpoints to human readable names
 
-        # for stream_dict in stream_consumers.values():
-        #     for process in stream_dict['producers'] + stream_dict['consumers']:
-        #         if not process in self.process_statistics:
-        #             self.process_statistics[process] = self.get_default_process_dict()
-
-
-        if web_server:
-            app = Flask(__name__)
-            @app.route("/")
-            def hello():
-                return render_template("index.html")
-
-            @app.route("/json/")
-            def json_output():
-                now = datetime.datetime.now()
-                return Response(json.dumps(dict(
-                    sorted_process_statistics=sorted(
-                        [(self.process_id_to_name.get(process_id, process_id), stats) for process_id, stats in self.process_statistics.items()],
-                        key=lambda itm: itm[0]
-                    ),
-                    stream_consumers=self.stream_consumers,
-                    # messages=self.messages,
-                    failed_messages=self.failed_messages,
-                    last_minutes=[(now - datetime.timedelta(minutes=i)).minute for i in range(0, 10)]
-                ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')
-
-            p = Thread(target=app.run, name="controller-web", kwargs=dict(
-                port=5000,
-                host="0.0.0.0",
-            ))
-            p.start()
 
     @batch_process(wait=1, limit=500)
     def process(self, messages):
@@ -143,7 +113,7 @@ class ControllerIntersection(Intersection):
                 self.process_statistics[current_process]['frequency'][rounded_seconds] = self.process_statistics[current_process]['frequency'].get(rounded_seconds, 0) + 1
                 self.process_statistics[current_process]['95_percentile'] = datetime.timedelta(seconds=percentile_from_dict(self.process_statistics[current_process]['frequency'], 95))
                 self.process_statistics[current_process]['avg_time_taken'] = self.process_statistics[current_process]['time_taken'] / sum(self.process_statistics[current_process]['frequency'].values())
-        yield
+        yield  # Hack: This is actually done by self.update() to trigger it even if there are no messages and to reduce messages to 1/s
 
     def update(self):
         now = datetime.datetime.now()
@@ -165,6 +135,22 @@ class ControllerIntersection(Intersection):
         for process in self.process_statistics.keys():
             self.process_statistics[process]['histogram'][(now + datetime.timedelta(minutes=1)).minute] = self.get_default_process_dict()['histogram'][0]  # reset next minute
             self.process_statistics[process]['waiting'] = self.waiting_messages.get(process, 0)
+
+        message = Message("_controller-%s" % uuid.uuid4(), {
+            'process_id_to_name': self.process_id_to_name,
+            'process_statistics': self.process_statistics,
+            'stream_consumers': self.stream_consumers,
+            'failed_messages': self.failed_messages,
+        })
+
+        if self.send_socks:  # Send updates to webserves. Uses the same code as intersection._process - consider deduplicating it
+            socket_address = self.get_grouper(self.send_grouper)(
+                self.send_socks.keys()
+            ).get_destination_for(message.grouping_value)
+            message.send(
+                self.send_socks[socket_address],
+                self.process_uuid
+            )
 
     def _update_wrapper(self):
         while True:
@@ -190,7 +176,7 @@ class ControllerIntersection(Intersection):
                 'id': unique_id
             })
 
-    def update_connections(self):
+    def update_connections(self, output_queue):
         update_connection_sock = self.context.socket(zmq.PULL)
         update_connection_port = update_connection_sock.bind_to_random_port("tcp://*")
         set_timeouts_on_socket(update_connection_sock)
@@ -230,6 +216,9 @@ class ControllerIntersection(Intersection):
                                 self.ramp_socks[queue].connect(consumer)
             refresh_connection_sock.send_json(self.queue_processes)
             logger.debug("Announced %s", self.queue_processes)
+            # Update our own send socks
+            if output_queue and output_queue in self.queue_processes:
+                self.set_send_socks(self.queue_processes, output_queue, self.context)
 
     def _process_wrapper(self):
         message_ack_sock = self.context.socket(zmq.PULL)
@@ -244,7 +233,7 @@ class ControllerIntersection(Intersection):
 
 
     @classmethod
-    def run(cls, controller_bind_address, stream_consumers):
+    def run(cls, input_stream, output_stream=None, refresh_connection_stream=None, grouper_cls=None):
 
         setproctitle("data-pipeline: %s" % cls.__name__)
         logger.info("Running %s" % cls.__name__)
@@ -252,14 +241,14 @@ class ControllerIntersection(Intersection):
         context = zmq.Context()
 
         self = cls(
-            stream_consumers,
+            {},
             context,
-            controller_bind_address
+            refresh_connection_stream
         )
 
         # Create Thread Factories :-)
 
-        thread_update_connections_factory = lambda: Thread(target=self.update_connections, name="controller-update_connections")
+        thread_update_connections_factory = lambda: Thread(target=self.update_connections, name="controller-update_connections", args=(output_stream, ))
         thread_update_stats_factory = lambda: Thread(target=self._update_wrapper, name="controller-update_stats")
         thread_process_factory = lambda: Thread(target=self._process_wrapper, name="controller-process_acks")
 

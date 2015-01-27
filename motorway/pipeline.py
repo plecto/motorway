@@ -6,6 +6,7 @@ from motorway.discovery.local import LocalDiscovery
 from motorway.utils import ramp_result_stream_name
 import zmq
 import logging
+from motorway.webserver import WebserverIntersection
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,9 @@ class Pipeline(object):
         logger.debug("Loaded definition")
 
         # Controller Transformer
-        self._add_controller()
+        # self._add_controller()
+        self.add_intersection(ControllerIntersection, None, '_web_server')
+        self.add_intersection(WebserverIntersection, '_web_server')
 
         logger.debug("Running queues")
         for queue_process in self._queue_processes:

@@ -1,8 +1,10 @@
+import json
 import multiprocessing
 import traceback
 import uuid
 import datetime
 from isodate import duration_isoformat
+from motorway.utils import DateTimeAwareJsonEncoder
 
 
 class Message(object):
@@ -72,7 +74,9 @@ class Message(object):
             self.producer_uuid = producer_uuid
         elif not self.producer_uuid:
             assert self.producer_uuid
-        queue.send_json(self._message())
+        queue.send(
+            json.dumps(self._message(), cls=DateTimeAwareJsonEncoder)
+        )
 
     def send_control_message(self, controller_queue, time_consumed=None, process_name=None, destination_endpoint=None,
                              destination_uuid=None):

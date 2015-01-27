@@ -174,14 +174,18 @@ class Intersection(GrouperMixin, object):
             try:
                 connections = refresh_connection_sock.recv_json()
                 if output_queue in connections:
-                    for send_conn in connections[output_queue]['streams']:
-                        if send_conn not in self.send_socks:
-                            send_sock = context.socket(zmq.PUSH)
-                            send_sock.connect(send_conn)
-                            self.send_socks[send_conn] = send_sock
-                            self.send_grouper = connections[output_queue]['grouping']
+                    self.set_send_socks(connections, output_queue, context)
+
             except zmq.Again:
                 pass
+
+    def set_send_socks(self, connections, output_queue, context):
+        for send_conn in connections[output_queue]['streams']:
+            if send_conn not in self.send_socks:
+                send_sock = context.socket(zmq.PUSH)
+                send_sock.connect(send_conn)
+                self.send_socks[send_conn] = send_sock
+                self.send_grouper = connections[output_queue]['grouping']
 
     def receive_messages(self, context=None, output_stream=None, grouper_cls=None):
         receive_sock = context.socket(zmq.PULL)
