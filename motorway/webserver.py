@@ -35,7 +35,7 @@ class WebserverIntersection(Intersection):
         @app.route("/api/errors/<process>/")
         def api_process_errors(process):
             return Response(json.dumps(dict(
-                failed_messages=[msg[1] for msg in self.failed_messages.values() if msg[0] == process],
+                failed_messages=[msg[1] for msg in self.failed_messages.values() if self.process_id_to_name[msg[0]] == process],
             ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')
 
         p = Thread(target=app.run, name="motorway-webserver", kwargs=dict(

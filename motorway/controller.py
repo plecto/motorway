@@ -158,7 +158,7 @@ class ControllerIntersection(Intersection):
             time.sleep(1)
 
     def fail(self, unique_id, process, error_message=""):
-        self.failed_messages[unique_id] = (self.process_id_to_name[process], error_message)
+        self.failed_messages[unique_id] = (process, error_message)
         if process not in self.ramp_socks:
             logging.debug("%s not in ramp_socks, probably a intersection which doesn't support feedback. Had %s" % (process, self.ramp_socks))
         else:
