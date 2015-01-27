@@ -6,6 +6,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class GroupingValueMissing(Exception):
+    pass
+
+
 class HashRingGrouper(object):
     def __init__(self, destinations):
         self.hash_ring = HashRing(destinations)
@@ -13,7 +17,10 @@ class HashRingGrouper(object):
     def get_destination_for(self, value):
         if type(value) is int:
             value = str(value)
-        return self.hash_ring.get_node(value)
+        try:
+            return self.hash_ring.get_node(value)
+        except TypeError:
+            raise GroupingValueMissing("'%s' is an invalid grouping value for HashRingGrouper" % (value, ))
 
 
 class RandomGrouper(object):

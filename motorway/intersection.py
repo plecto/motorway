@@ -103,9 +103,9 @@ class Intersection(GrouperMixin, object):
         setproctitle("data-pipeline: %s" % process_name)
         context = zmq.Context()
 
-        # Run threads
+        # Create Thread Factories :-)
 
-        thread_update_connections = Thread(target=self.connection_thread, name="connection_thread", kwargs={
+        thread_update_connections_factory = lambda: Thread(target=self.connection_thread, name="connection_thread", kwargs={
             'refresh_connection_stream': refresh_connection_stream,
             'context': context,
             'input_queue': input_stream,
@@ -114,17 +114,31 @@ class Intersection(GrouperMixin, object):
             'process_name': process_name,
             'grouper_cls': grouper_cls
         })
-        thread_update_connections.start()
 
-        thread_main = Thread(target=self.receive_messages, name="message_producer", kwargs={
+        thread_main_factory = lambda: Thread(target=self.receive_messages, name="message_producer", kwargs={
             'context': context,
             'output_stream': output_stream,
             'grouper_cls': grouper_cls,
         })
+
+        # Run threads
+
+        thread_update_connections = thread_update_connections_factory()
+        thread_update_connections.start()
+
+        thread_main = thread_main_factory()
         thread_main.start()
 
         while True:
-            time.sleep(1)
+            if not thread_update_connections.isAlive():
+                logger.error("Thread thread_update_connections crashed in %s" % self.__class__.__name__)
+                thread_update_connections = thread_update_connections_factory()
+                thread_update_connections.start()
+            if not thread_main.isAlive():
+                logger.error("Thread thread_main crashed in %s" % self.__class__.__name__)
+                thread_main = thread_main_factory()
+                thread_main.start()
+            time.sleep(10)
 
     def connection_thread(self, context=None, refresh_connection_stream=None, input_queue=None, output_queue=None, process_id=None,
                           process_name=None, grouper_cls=None):
