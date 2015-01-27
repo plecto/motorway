@@ -3,8 +3,20 @@ var NodesContainer = React.createClass({
 		return (
 			<div className="nodes-container">
 			{$.map(this.props.nodes, function (node) {
+				var nodeClass = 'node';
+				if (node.waiting < 1) {
+					nodeClass += ' node-status-zero';
+				} else if (node.waiting < 10) {
+					nodeClass += ' node-status-low';
+				}
+				if (node.secondsRemaining > PipelineSettings.remainingSecondsDanger) {
+					nodeClass += ' node-status-danger';
+				} else if (node.secondsRemaining > PipelineSettings.remainingSecondsWarning) {
+					nodeClass += ' node-status-warning';
+				}
+
 				return (
-					<div key={node.name} className="node">
+					<div key={node.name} className={nodeClass}>
 						<div className="node-inner">
 							<NodeCircle size={node.secondsRemaining} />
 							<div className="node-content">
@@ -15,7 +27,10 @@ var NodesContainer = React.createClass({
 									<p className="node-time-percentile">{Utils.formatISODuration(node.percentile)}</p>
 									<p className="node-time-average">{Utils.formatISODuration(node.avgTime)}</p>
 								</div>
-								<h2 className="node-waiting">{node.waiting}</h2>
+								<div className="node-waiting">
+									<p className="node-waiting-main">{Utils.formatSeconds(node.secondsRemaining)}</p>
+									<h2 className="node-waiting-alt">{node.waiting}</h2>
+								</div>
 							</div>
 							<NodeGraph items={node.latestHistogram} />
 						</div>
@@ -46,7 +61,7 @@ var NodeGraph = React.createClass({
 	render: function() {
 		return (
 			<div className="node-graph">
-				{$.map(this.props.items, function (item, i) {
+				{this.props.items.map(function (item) {
 					var blank = {
 						'height': parseInt(100-parseInt(item.value.success_percentage)-parseInt(item.value.error_percentage)-parseInt(item.value.timeout_percentage))+'%'
 					};

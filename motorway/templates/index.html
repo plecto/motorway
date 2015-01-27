@@ -16,6 +16,13 @@
 	<div id="disconnected-message"><div class="disconnected-inner">DISCONNECTED</div></div>
 	<div id="container"></div>
 	<script type="text/javascript">{% include 'utils.js' %}</script>
+	<script type="text/javascript">
+		var PipelineSettings = {
+			'apiUrl': '/json/',
+			'remainingSecondsWarning': 5 * 60,
+			'remainingSecondsDanger': 10 * 60
+		}
+	</script>
 	<script type="text/jsx">{% include 'components.jsx' %}</script>
 	<script type="text/jsx">{% include 'pipeline.jsx' %}</script>
 </body>

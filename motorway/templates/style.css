@@ -114,8 +114,10 @@ body.disconnected #disconnected-message {
 .node-content {
 	position: relative;
 	height: 100%;
-	z-index: 10;
+	z-index: 50;
 	padding: 15px;
+	opacity: 1;
+	transition: opacity 0.5s;
 }
 
 .node-icon {
@@ -148,7 +150,7 @@ body.disconnected #disconnected-message {
 
 .node-time {
 	position: absolute;
-	top: 50%;
+	top: 45%;
 	right: 15px;
 	text-align: right;
 }
@@ -163,10 +165,43 @@ body.disconnected #disconnected-message {
 
 .node-waiting {
 	position: absolute;
-	top: 50%;
+	top: 45%;
 	left: 15px;
-	font-size: 520%;
+}
+.node-waiting-main {
+	font-size: 500%;
 	color: rgba(255,255,255,0.8);
+}
+.node-waiting-alt {
+	font-size: 220%;
+	font-weight: 300;
+	color: rgba(255,255,255,0.4);
+}
+
+/* node status */
+.node-status-zero .node-content {
+	opacity: 0.5;
+}
+.node-status-low .node-content {
+	opacity: 0.8;
+}
+.node-status-warning .node-icon {
+	background: rgba(255, 222, 34, 0.8);
+}
+.node-status-warning .node-name {
+	color: rgba(255, 222, 34, 0.8);
+}
+.node-status-warning .node-circle {
+	background: rgba(255, 222, 34, 0.8);
+}
+.node-status-danger .node-icon {
+	background: rgba(255,0,20,0.8);
+}
+.node-status-danger .node-name {
+	color: rgba(255,0,20,0.8);
+}
+.node-status-danger .node-circle {
+	background: rgba(255,0,20,1);
 }
 
 
@@ -215,6 +250,7 @@ body.disconnected #disconnected-message {
 
 .node-circle {
 	position: absolute;
+	z-index: 10;
 	top: 100%;
 	left: 0;
 	margin: 0;

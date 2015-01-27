@@ -33,6 +33,22 @@ var Utils = {
 		return seconds;
 	},
 
+	formatSeconds: function(seconds) {
+		var result = '';
+		var hours = parseInt(seconds / 60 / 60);
+		if (hours >= 1) {
+			result += hours+'h ';
+			seconds -= hours * 60 * 60;
+		}
+		var minutes = parseInt(seconds / 60);
+		if (minutes >= 1) {
+			result += minutes+'m ';
+			seconds -= minutes * 60;
+		}
+		result += parseInt(seconds)+'s';
+		return result;
+	},
+
 	formatISODuration: function(d) {
 		var hours = 0;
 		var minutes = 0;

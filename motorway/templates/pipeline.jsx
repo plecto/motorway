@@ -46,7 +46,7 @@ var Pipeline = React.createClass({
 
 	loadState: function() {
 		var that = this;
-		$.getJSON(this.props.url, function(data) {
+		$.getJSON(PipelineSettings.apiUrl, function(data) {
 			var nodes = [];
 			var maxHistogramValue = 0;
 			var lastMinutes = data['last_minutes'];
@@ -108,5 +108,5 @@ var Pipeline = React.createClass({
 	}
 });
 
-React.render(<Pipeline url="/json" />, document.querySelector('#container'));
+React.render(<Pipeline />, document.querySelector('#container'));
 
