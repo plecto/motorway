@@ -66,14 +66,19 @@ var Pipeline = React.createClass({
 					if (maxHistogramValue > 0) {
 						histogram[i]['success_percentage'] = (item['success_count'] / maxHistogramValue) * 100;
 						histogram[i]['error_percentage'] = (item['error_count'] / maxHistogramValue) * 100;
+						histogram[i]['timeout_percentage'] = (item['timeout_count'] / maxHistogramValue) * 100;
 					} else {
 						histogram[i]['success_percentage'] = 0;
 						histogram[i]['error_percentage'] = 0;
+						histogram[i]['timeout_percentage'] = 0;
 					}
 				});
 				node.histogram = histogram;
 				node.latestHistogram = lastMinutes.map(function(minute) {
-					return node.histogram[minute];
+					return {
+						'minute': minute,
+						'value': node.histogram[minute]
+					};
 				});
 			});
 			if (that.isMounted()) {

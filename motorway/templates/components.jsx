@@ -48,18 +48,19 @@ var NodeGraph = React.createClass({
 			<div className="node-graph">
 				{$.map(this.props.items, function (item, i) {
 					var blank = {
-						'height': parseInt(100-parseInt(item.success_percentage)-parseInt(item.error_percentage))+'%;'
+						'height': parseInt(100-parseInt(item.value.success_percentage)-parseInt(item.value.error_percentage)-parseInt(item.value.timeout_percentage))+'%'
 					};
 					var success = {
-						'height': parseInt(item.success_percentage)+'%;'
+						'height': parseInt(item.value.success_percentage)+'%'
 					};
 					var error = {
-						'height': parseInt(item.error_percentage)+'%;'
+						'height': parseInt(item.value.error_percentage)+'%'
 					};
-					return <span className="node-graph-bar">
+					return <span className="node-graph-bar" key={item.minute}>
 						<span className="node-graph-bar-part node-graph-blank" style={blank}></span>
-						<span className="node-graph-bar-part node-graph-success" style={success}>{item.success_count}</span>
-						<span className="node-graph-bar-part node-graph-error" style={error}>{item.error_count}</span>
+						<span className="node-graph-bar-part node-graph-success" style={success}>{item.value.success_count}</span>
+						<span className="node-graph-bar-part node-graph-timeout" style={error}>{item.value.timeout_count}</span>
+						<span className="node-graph-bar-part node-graph-error" style={error}>{item.value.error_count}</span>
 					</span>
 				})}
 			</div>
