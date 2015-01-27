@@ -104,6 +104,14 @@ body.disconnected #disconnected-message {
 	height: 20%;
 	padding: 5px;
 }
+.node-size-30 {
+	width: 20%;
+	height: 16.6667%;
+}
+.node-size-42 {
+	width: 16.6667%;
+	height: 14.2857%;
+}
 .node-inner {
 	height: 100%;
 	background: rgba(100,100,100,0.4);

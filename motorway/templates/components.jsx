@@ -1,9 +1,18 @@
 var NodesContainer = React.createClass({
 	render: function() {
+		// node size class
+		var nodeSizeClass = '';
+		if (this.props.nodes.length > 30) {
+			nodeSizeClass = ' node-size-42';
+		} else if (this.props.nodes.length > 20) {
+			nodeSizeClass = ' node-size-30';
+		}
+
 		return (
 			<div className="nodes-container">
 			{$.map(this.props.nodes, function (node) {
-				var nodeClass = 'node';
+				// node status class
+				var nodeClass = 'node' + nodeSizeClass;
 				if (node.waiting < 1) {
 					nodeClass += ' node-status-zero';
 				} else if (node.waiting < 10) {
