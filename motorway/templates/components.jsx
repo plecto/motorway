@@ -68,13 +68,16 @@ var NodeGraph = React.createClass({
 					var success = {
 						'height': parseInt(item.value.success_percentage)+'%'
 					};
+					var timeout = {
+						'height': parseInt(item.value.timeout_percentage)+'%'
+					};
 					var error = {
 						'height': parseInt(item.value.error_percentage)+'%'
 					};
 					return <span className="node-graph-bar" key={item.minute}>
 						<span className="node-graph-bar-part node-graph-blank" style={blank}></span>
 						<span className="node-graph-bar-part node-graph-success" style={success}>{item.value.success_count}</span>
-						<span className="node-graph-bar-part node-graph-timeout" style={error}>{item.value.timeout_count}</span>
+						<span className="node-graph-bar-part node-graph-timeout" style={timeout}>{item.value.timeout_count}</span>
 						<span className="node-graph-bar-part node-graph-error" style={error}>{item.value.error_count}</span>
 					</span>
 				})}
