@@ -1,18 +1,26 @@
 var NodesContainer = React.createClass({
+
+	getNodeSize: function(count) {
+		var ratio = 0.8;
+		var numHoriz = parseInt(Math.sqrt(count/ratio));
+		var width = 100/numHoriz;
+		var numVert = Math.ceil(count / numHoriz);
+		return [width, 100 / numVert];
+	},
+
 	render: function() {
-		// node size class
-		var nodeSizeClass = '';
-		if (this.props.nodes.length > 30) {
-			nodeSizeClass = ' node-size-42';
-		} else if (this.props.nodes.length > 20) {
-			nodeSizeClass = ' node-size-30';
-		}
+		// node size
+		var nodeSize = this.getNodeSize(this.props.nodes.length);
+		var nodeStyle = {
+			'width': nodeSize[0]+'%',
+			'height': nodeSize[1]+'%'
+		};
 
 		return (
 			<div className="nodes-container">
 			{$.map(this.props.nodes, function (node) {
 				// node status class
-				var nodeClass = 'node' + nodeSizeClass;
+				var nodeClass = 'node';
 				if (node.waiting < 1) {
 					nodeClass += ' node-status-zero';
 				} else if (node.waiting < 10) {
@@ -25,7 +33,7 @@ var NodesContainer = React.createClass({
 				}
 
 				return (
-					<div key={node.name} className={nodeClass}>
+					<div key={node.name} className={nodeClass} style={nodeStyle}>
 						<div className="node-inner">
 							<NodeCircle size={node.secondsRemaining} />
 							<div className="node-content">
