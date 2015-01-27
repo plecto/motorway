@@ -1,29 +1,14 @@
-<!DOCTYPE html>
-<html>
-<head lang="en">
-	<meta charset="UTF-8" />
-	<meta http-equiv="x-ua-compatible" content="ie=edge,chrome=1" />
-	<meta name="viewport" content="user-scalable=0,initial-scale=1.0,minimal-ui" />
-	<title>Pipeline Stats</title>
-	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
-	<style type="text/css">{% include 'style.css' %}</style>
-	<script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
-	<script src="//fb.me/JSXTransformer-0.12.2.js"></script>
-	{% if 1 %}<script src="//fb.me/react-0.12.2.js"></script>{% else %}<script src="http://fb.me/react-0.12.2.min.js"></script>{% endif %}
-</head>
-<body>
-	<div id="pulse"></div>
-	<div id="disconnected-message"><div class="disconnected-inner">DISCONNECTED</div></div>
-	<div id="container"></div>
-	<script type="text/javascript">{% include 'utils.js' %}</script>
+{% extends 'base.html' %}
+
+{% block content %}
 	<script type="text/javascript">
 		var PipelineSettings = {
 			'apiUrl': '/api/status/',
+			'detailUrlPrefix': '/detail/',
 			'remainingSecondsWarning': 5 * 60,
 			'remainingSecondsDanger': 10 * 60
 		}
 	</script>
 	<script type="text/jsx">{% include 'components.jsx' %}</script>
 	<script type="text/jsx">{% include 'pipeline.jsx' %}</script>
-</body>
-</html>
+{% endblock %}

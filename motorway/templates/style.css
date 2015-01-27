@@ -133,6 +133,8 @@ body.disconnected #disconnected-message {
 	border-radius: 100%;
 }
 .node-name {
+	display: block;
+	text-decoration: none;
 	font-size: 200%;
 	line-height: 0.8;
 	font-weight: 400;
@@ -258,3 +260,18 @@ body.disconnected #disconnected-message {
 	background: #fff;
 	opacity: 0.1;
 }
+
+
+/*
+ * Detail
+ * * * * * * * * * * * * * * * * * *
+*/
+
+.failed-message {
+	font-size: 200%;
+	margin: 15px;
+	padding: 15px;
+	border: 1px solid rgba(255,255,255,0.2);
+	border-radius: 5px;
+}
+

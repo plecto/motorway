@@ -41,6 +41,8 @@ var Pipeline = React.createClass({
 
 		nodeData.secondsRemaining = Utils.getSecondsFromDuration(nodeData.avgTime) * nodeData.waiting;
 
+		nodeData.url = PipelineSettings.detailUrlPrefix + nodeData.name;
+
 		return nodeData;
 	},
 

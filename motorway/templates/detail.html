@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block content %}
+	<script type="text/javascript">
+		var DetailSettings = {
+			'apiUrl': '/api/detail/{{ process }}/'
+		}
+	</script>
+	<script type="text/jsx">{% include 'components.jsx' %}</script>
+	<script type="text/jsx">{% include 'detail.jsx' %}</script>
+{% endblock %}

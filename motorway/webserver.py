@@ -16,9 +16,14 @@ class WebserverIntersection(Intersection):
         self.failed_messages = {}
 
         app = Flask(__name__)
+
         @app.route("/")
-        def hello():
+        def index():
             return render_template("index.html")
+
+        @app.route("/detail/<process>/")
+        def detail(process):
+            return render_template("detail.html", process=process)
 
         @app.route("/api/status/")
         def api_status():
@@ -32,8 +37,8 @@ class WebserverIntersection(Intersection):
                 last_minutes=[(now - datetime.timedelta(minutes=i)).minute for i in range(0, 10)]
             ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')
 
-        @app.route("/api/errors/<process>/")
-        def api_process_errors(process):
+        @app.route("/api/detail/<process>/")
+        def api_detail(process):
             return Response(json.dumps(dict(
                 failed_messages=[msg[1] for msg in self.failed_messages.values() if msg[0] == process],
             ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')

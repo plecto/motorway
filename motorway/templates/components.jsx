@@ -21,7 +21,7 @@ var NodesContainer = React.createClass({
 							<NodeCircle size={node.secondsRemaining} />
 							<div className="node-content">
 								<span className="node-icon"><span className={node.iconClass}></span></span>
-								<h1 className="node-name">{node.title}</h1>
+								<a href={node.url} target="_blank" className="node-name">{node.title}</a>
 								<p className="node-type">{node.nodeType}</p>
 								<div className="node-time">
 									<p className="node-time-percentile">{Utils.formatISODuration(node.percentile)}</p>
