@@ -13,6 +13,8 @@ Motorway re-implemented the same [algorithm to store message state](https://stor
 
 Unlike with Storm where you submit a topology to an existing cluster, with Motorway you simply add a new node with the new code and take down the other afterwards. Motorway does not (currently) communicate across nodes, so you need something like Amazon Kinesis (included), SQS (included) or Kafka to keep track of the incoming data.
 
+**New:** Now with pypy support for double speed!
+
 Word Count Example
 ==================
 
