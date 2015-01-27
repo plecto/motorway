@@ -13,15 +13,15 @@ class WebserverIntersection(Intersection):
         self.process_id_to_name = {}
         self.process_statistics = {}
         self.stream_consumers = {}
-        self.failed_messages = []
+        self.failed_messages = {}
 
         app = Flask(__name__)
         @app.route("/")
         def hello():
             return render_template("index.html")
 
-        @app.route("/json/")
-        def json_output():
+        @app.route("/api/status/")
+        def api_status():
             now = datetime.datetime.now()
             return Response(json.dumps(dict(
                 sorted_process_statistics=sorted(
@@ -29,12 +29,16 @@ class WebserverIntersection(Intersection):
                     key=lambda itm: itm[0]
                 ),
                 stream_consumers=self.stream_consumers,
-                # messages=self.messages,
-                failed_messages=self.failed_messages,
                 last_minutes=[(now - datetime.timedelta(minutes=i)).minute for i in range(0, 10)]
             ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')
 
-        p = Thread(target=app.run, name="controller-web", kwargs=dict(
+        @app.route("/api/errors/<process>/")
+        def api_process_errors(process):
+            return Response(json.dumps(dict(
+                failed_messages=[msg[1] for msg in self.failed_messages.values() if msg[0] == process],
+            ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')
+
+        p = Thread(target=app.run, name="motorway-webserver", kwargs=dict(
             port=5000,
             host="0.0.0.0",
         ))
