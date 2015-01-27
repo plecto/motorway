@@ -106,7 +106,7 @@ body.disconnected #disconnected-message {
 }
 .node-inner {
 	height: 100%;
-	background: rgba(100,100,100,0.3);
+	background: rgba(100,100,100,0.4);
 	position: relative;
 	border-radius: 5px;
 	overflow: hidden;
@@ -123,7 +123,7 @@ body.disconnected #disconnected-message {
 	font-size: 260%;
 	margin: 0;
 	color: rgba(0,0,0,0.8);
-	background: rgba(255,255,255,0.7);
+	background: rgba(255,255,255,0.8);
 	text-align: center;
 	padding: 6px;
 	width: 40px;
@@ -134,14 +134,15 @@ body.disconnected #disconnected-message {
 	font-size: 200%;
 	line-height: 0.8;
 	font-weight: 400;
-	color: rgba(255,255,255,0.7);
+	color: rgba(255,255,255,0.8);
 	margin: 4px 0 0 55px;
 }
 .node-type {
 	display: block;
 	font-size: 140%;
 	font-weight: 300;
-	color: rgba(255,255,255,0.3);
+	letter-spacing: 1px;
+	color: rgba(255,255,255,0.4);
 	margin: 3px 0 0 55px;
 }
 
@@ -157,7 +158,7 @@ body.disconnected #disconnected-message {
 .node-time-average {
 	margin: 5px 0 0 0;
 	font-size: 180%;
-	color: rgba(255,255,255,0.4);
+	color: rgba(255,255,255,0.5);
 }
 
 .node-waiting {
@@ -165,6 +166,7 @@ body.disconnected #disconnected-message {
 	top: 50%;
 	left: 15px;
 	font-size: 520%;
+	color: rgba(255,255,255,0.8);
 }
 
 
@@ -189,17 +191,20 @@ body.disconnected #disconnected-message {
 }
 .node-graph-bar-part {
 	display: block;
-	color: rgba(255,255,255,0.1);
+	color: rgba(255,255,255,0.2);
 	text-align: center;
 	font-size: 100%;
 	line-height: 200%;
 	overflow: hidden;
 }
 .node-graph-success {
-	background: rgba(0,255,150,0.05);
+	background: rgba(0,255,150,0.1);
 }
 .node-graph-error {
-	background: rgba(255,0,20,0.1);
+	background: rgba(255,0,20,0.15);
+}
+.node-graph-timeout {
+	background: rgba(255, 222, 34, 0.15);
 }
 
 
