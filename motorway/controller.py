@@ -257,14 +257,34 @@ class ControllerIntersection(Intersection):
             controller_bind_address
         )
 
-        thread_update_connections = Thread(target=self.update_connections, name="controller-update_connections")
+        # Create Thread Factories :-)
+
+        thread_update_connections_factory = lambda: Thread(target=self.update_connections, name="controller-update_connections")
+        thread_update_stats_factory = lambda: Thread(target=self._update_wrapper, name="controller-update_stats")
+        thread_process_factory = lambda: Thread(target=self._process_wrapper, name="controller-process_acks")
+
+        # Run threads
+
+        thread_update_connections = thread_update_connections_factory()
         thread_update_connections.start()
 
-        thread_update_stats = Thread(target=self._update_wrapper, name="controller-update_stats")
+        thread_update_stats = thread_update_stats_factory()
         thread_update_stats.start()
 
-        thread_process = Thread(target=self._process_wrapper, name="controller-process_acks")
+        thread_process = thread_process_factory()
         thread_process.start()
 
         while True:
-            time.sleep(1)
+            if not thread_update_connections.isAlive():
+                logger.error("Thread thread_update_connections crashed in %s" % self.__class__.__name__)
+                thread_update_connections = thread_update_connections_factory()
+                thread_update_connections.start()
+            if not thread_update_stats.isAlive():
+                logger.error("Thread thread_update_stats crashed in %s" % self.__class__.__name__)
+                thread_update_stats = thread_update_stats_factory()
+                thread_update_stats.start()
+            if not thread_process.isAlive():
+                logger.error("Thread thread_process crashed in %s" % self.__class__.__name__)
+                thread_process = thread_process_factory()
+                thread_process.start()
+            time.sleep(10)

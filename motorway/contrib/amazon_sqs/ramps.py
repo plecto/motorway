@@ -7,6 +7,7 @@ import boto.sqs
 class SQSRamp(Ramp):
     queue_name = None
     sqs_message_class = SQSJSONMessage
+    json_group_key = None
 
     def __init__(self):
         super(SQSRamp, self).__init__()
@@ -28,7 +29,11 @@ class SQSRamp(Ramp):
         for msg in self.queue.get_messages(num_messages=10, wait_time_seconds=5, visibility_timeout=10*60):
             # Gets max 10 messages, waiting for max 5 seconds to receive them and blocks other from receiving it for 10m
             self.messages[msg.id] = msg
-            yield Message(msg.id, msg.get_body())
+            if self.json_group_key:
+                body = msg.get_body()
+                yield Message(msg.id, body, grouping_value=body[self.json_group_key])
+            else:
+                yield Message(msg.id, msg.get_body())
 
     def success(self, _id):
         self.queue.delete_message(self.messages[_id])  # TODO: Do this on ack

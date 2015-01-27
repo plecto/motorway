@@ -4,6 +4,7 @@ from setproctitle import setproctitle
 import datetime
 from threading import Thread
 import uuid
+from motorway.grouping import GroupingValueMissing
 from motorway.mixins import GrouperMixin
 from motorway.utils import set_timeouts_on_socket, get_connections_block
 import zmq
@@ -70,30 +71,50 @@ class Ramp(GrouperMixin, object):
 
         context = zmq.Context()
 
-        # Run threads
+        # Create Thread Factories :-)
 
-        thread_update_connections = Thread(target=self.connection_thread, name="connection_thread", kwargs={
+        thread_update_connections_factory = lambda: Thread(target=self.connection_thread, name="connection_thread", kwargs={
             'refresh_connection_stream': refresh_connection_stream,
             'context': context,
             'queue': queue,
             'process_id': process_id,
             'process_name': process_name,
         })
-        thread_update_connections.start()
 
-        thread_main = Thread(target=self.message_producer, name="message_producer", kwargs={
+        thread_main_factory = lambda: Thread(target=self.message_producer, name="message_producer", kwargs={
             'context': context,
             'process_id': process_id,
         })
-        thread_main.start()
 
-        thread_results = Thread(target=self.receive_replies, name="results", kwargs={
+        thread_results_factory = lambda: Thread(target=self.receive_replies, name="results", kwargs={
             'context': context,
         })
+
+        # Run threads
+
+        thread_update_connections = thread_update_connections_factory()
+        thread_update_connections.start()
+
+        thread_main = thread_main_factory()
+        thread_main.start()
+
+        thread_results = thread_results_factory()
         thread_results.start()
 
         while True:
-            time.sleep(1)
+            if not thread_update_connections.isAlive():
+                logger.error("Thread thread_update_connections crashed in %s" % self.__class__.__name__)
+                thread_update_connections = thread_update_connections_factory()
+                thread_update_connections.start()
+            if not thread_main.isAlive():
+                logger.error("Thread thread_main crashed in %s" % self.__class__.__name__)
+                thread_main = thread_results_factory()
+                thread_main.start()
+            if not thread_results.isAlive():
+                logger.error("Thread thread_results crashed in %s" % self.__class__.__name__)
+                thread_results = thread_results_factory()
+                thread_results.start()
+            time.sleep(10)
 
     def connection_thread(self, context=None, refresh_connection_stream=None, queue=None, process_id=None,
                           process_name=None):
@@ -149,9 +170,12 @@ class Ramp(GrouperMixin, object):
                 for received_message_result in self:
                     for generated_message in received_message_result:
                         if generated_message is not None:
-                            socket_address = self.get_grouper(self.send_grouper)(
-                                self.send_socks.keys()
-                            ).get_destination_for(generated_message.grouping_value)
+                            try:
+                                socket_address = self.get_grouper(self.send_grouper)(
+                                    self.send_socks.keys()
+                                ).get_destination_for(generated_message.grouping_value)
+                            except GroupingValueMissing:
+                                raise GroupingValueMissing("Message '%s' provided an invalid grouping_value: '%s'" % (generated_message.content, generated_message.grouping_value) )
                             generated_message.send(
                                 self.send_socks[socket_address],
                                 process_id
