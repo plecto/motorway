@@ -102,7 +102,7 @@ class ControllerIntersection(Intersection):
                     del self.messages[message.ramp_unique_id]
                 self.process_statistics[original_process]['failed'] += 1
                 self.process_statistics[original_process]['histogram'][datetime.datetime.now().minute]['error_count'] += 1
-                self.fail(message.ramp_unique_id, error_message=message.error_message, process=destination_process)
+                self.fail(message.ramp_unique_id, error_message=message.error_message, process=original_process)
             self.process_statistics[original_process]['processed'] += 1
 
             # Update statistics
@@ -126,7 +126,7 @@ class ControllerIntersection(Intersection):
             elif (now - start_time) > datetime.timedelta(minutes=30):
                 del self.messages[unique_id] # clean up
                 self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['timeout_count'] += 1
-                self.fail(unique_id, process, error_message="Message timed out")
+                self.fail(unique_id, original_process, error_message="Message timed out")
             elif ack_value > 0:
                 waiting_messages[process] = waiting_messages.get(process, 0) + 1
         self.waiting_messages = waiting_messages
@@ -158,7 +158,7 @@ class ControllerIntersection(Intersection):
             time.sleep(1)
 
     def fail(self, unique_id, process, error_message=""):
-        self.failed_messages[unique_id] = (self.process_id_to_name[process], error_message)
+        self.failed_messages[unique_id] = (process, error_message)
         if process not in self.ramp_socks:
             logging.debug("%s not in ramp_socks, probably a intersection which doesn't support feedback. Had %s" % (process, self.ramp_socks))
         else:
