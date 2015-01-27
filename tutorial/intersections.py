@@ -1,6 +1,7 @@
 from collections import defaultdict
 import random
 import time
+import uuid
 from motorway.contrib.amazon_sqs.intersections import SQSInsertIntersection
 from motorway.decorators import batch_process
 from motorway.messages import Message
@@ -24,7 +25,7 @@ class WordCountIntersection(Intersection):
         for message in messages:
             self._count[message.content] += 1
             message.ack()
-        yield Message(0, self._count)
+        yield Message(uuid.uuid4(), self._count)
 
 
 class AggregateIntersection(Intersection):
