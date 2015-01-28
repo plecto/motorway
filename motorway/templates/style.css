@@ -81,6 +81,13 @@ body.disconnected #disconnected-message {
 	height: 20px;
 }
 
+.loader {
+	font-size: 1200%;
+	padding: 200px 0 0 0;
+	color: rgba(255,255,255,0.7);
+	text-align: center;
+}
+
 
 /*
  * Nodes
