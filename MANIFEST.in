@@ -1,2 +1,2 @@
 include requirements.txt
-include motorway/templates/index.html
+include motorway/templates/*
