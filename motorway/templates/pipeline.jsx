@@ -35,7 +35,9 @@ var Pipeline = React.createClass({
 
 		var icons = {
 			'ramp': 'truck',
-			'intersection': 'exchange'
+			'intersection': 'exchange',
+			'tap': 'truck',
+			'transformer': 'exchange'
 		};
 		nodeData.iconClass = 'fa fa-'+icons[nodeType];
 
