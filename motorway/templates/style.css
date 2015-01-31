@@ -81,6 +81,13 @@ body.disconnected #disconnected-message {
 	height: 20px;
 }
 
+.loader {
+	font-size: 1200%;
+	padding: 200px 0 0 0;
+	color: rgba(255,255,255,0.7);
+	text-align: center;
+}
+
 
 /*
  * Nodes
@@ -103,10 +110,11 @@ body.disconnected #disconnected-message {
 	width: 25%;
 	height: 20%;
 	padding: 5px;
+	transition: opacity 0.5s;
 }
 .node-inner {
 	height: 100%;
-	background: rgba(100,100,100,0.4);
+	background: rgba(100,100,100,0.25);
 	position: relative;
 	border-radius: 5px;
 	overflow: hidden;
@@ -135,7 +143,7 @@ body.disconnected #disconnected-message {
 .node-name {
 	display: block;
 	text-decoration: none;
-	font-size: 200%;
+	font-size: 220%;
 	line-height: 0.8;
 	font-weight: 400;
 	color: rgba(255,255,255,0.8);
@@ -184,23 +192,20 @@ body.disconnected #disconnected-message {
 .node-status-zero .node-content {
 	opacity: 0.5;
 }
+.node-status-zero {
+	opacity: 0.7;
+}
 .node-status-low .node-content {
-	opacity: 0.8;
+	opacity: 0.9;
 }
 .node-status-warning .node-icon {
 	background: rgba(255, 222, 34, 0.8);
-}
-.node-status-warning .node-name {
-	color: rgba(255, 222, 34, 0.8);
 }
 .node-status-warning .node-circle {
 	background: rgba(255, 222, 34, 0.8);
 }
 .node-status-danger .node-icon {
-	background: rgba(255,0,20,0.8);
-}
-.node-status-danger .node-name {
-	color: rgba(255,0,20,0.8);
+	background: rgba(255, 42, 57, 0.80);
 }
 .node-status-danger .node-circle {
 	background: rgba(255,0,20,1);
@@ -233,6 +238,7 @@ body.disconnected #disconnected-message {
 	font-size: 100%;
 	line-height: 200%;
 	overflow: hidden;
+	transition: height 0.5s;
 }
 .node-graph-success {
 	background: rgba(0,255,150,0.1);
@@ -258,7 +264,8 @@ body.disconnected #disconnected-message {
 	margin: 0;
 	border-radius: 100%;
 	background: #fff;
-	opacity: 0.1;
+	opacity: 0.15;
+	transition: width 0.5s, height 0.5s, margin-left 0.5s, margin-top 0.5s;
 }
 
 

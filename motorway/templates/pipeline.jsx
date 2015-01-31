@@ -11,11 +11,17 @@ var Pipeline = React.createClass({
 	},
 
 	render: function() {
-		return (
-			<div className="pipeline">
-				<NodesContainer nodes={this.state.nodes} />
-			</div>
-		)
+		if (this.state.nodes.length) {
+			return (
+				<div className="pipeline">
+					<NodesContainer nodes={this.state.nodes} />
+				</div>
+				)
+		} else {
+			return (
+				<div className="loader"><span className="fa fa-circle-o-notch fa-spin"></span></div>
+			)
+		}
 	},
 
 	getNodeData: function(node) {
@@ -35,7 +41,9 @@ var Pipeline = React.createClass({
 
 		var icons = {
 			'ramp': 'truck',
-			'intersection': 'exchange'
+			'intersection': 'exchange',
+			'tap': 'truck',
+			'transformer': 'exchange'
 		};
 		nodeData.iconClass = 'fa fa-'+icons[nodeType];
 
