@@ -41,12 +41,12 @@ var NodesContainer = React.createClass({
 								<a href={node.url} target="_blank" className="node-name">{node.title}</a>
 								<p className="node-type">{node.nodeType}</p>
 								<div className="node-time">
-									<p className="node-time-percentile">{Utils.formatISODuration(node.percentile)}</p>
-									<p className="node-time-average">{Utils.formatISODuration(node.avgTime)}</p>
+									<p className="node-time-average">x&#772;: {Utils.formatISODuration(node.avgTime)}</p>
+                                    <p className="node-time-percentile">95%: {Utils.formatISODuration(node.percentile)}</p>
 								</div>
 								<div className="node-waiting">
-									<p className="node-waiting-main">{Utils.formatSeconds(node.secondsRemaining)}</p>
-									<h2 className="node-waiting-alt">{node.waiting}</h2>
+									<p className="node-waiting-main">{node.waiting} / {Utils.formatSeconds(node.secondsRemaining)}</p>
+									<h2 className="node-waiting-alt">&#35; Waiting / Est. time to process</h2>
 								</div>
 							</div>
 							<NodeGraph items={node.latestHistogram} />

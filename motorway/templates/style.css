@@ -156,10 +156,10 @@ body.disconnected #disconnected-message {
 	right: 15px;
 	text-align: right;
 }
-.node-time-percentile {
+.node-time-average {
 	font-size: 260%;
 }
-.node-time-average {
+.node-time-percentile {
 	margin: 5px 0 0 0;
 	font-size: 180%;
 	color: rgba(255,255,255,0.5);
