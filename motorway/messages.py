@@ -106,7 +106,7 @@ class Message(object):
             'destination_uuid': destination_uuid
         })
 
-    def ack(self):
+    def ack(self, time_consumed=None):
         """
         Send a message to the controller that this message was properly processed
         """
@@ -115,7 +115,7 @@ class Message(object):
             'ack_value': self.ack_value,
             'content': {
                 'process_name': self.process_name,
-                'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
+                'duration': duration_isoformat(time_consumed or (datetime.datetime.now() - self.init_time))
             },
             'producer_uuid': self.producer_uuid,
             'destination_uuid': self.producer_uuid

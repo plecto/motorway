@@ -24,8 +24,8 @@ class WordCountIntersection(Intersection):
     def process(self, messages):
         for message in messages:
             self._count[message.content] += 1
-            message.ack()
-        yield Message(uuid.uuid4(), self._count)
+            self.ack(message)
+        yield Message(str(uuid.uuid4()), self._count)
 
 
 class AggregateIntersection(Intersection):

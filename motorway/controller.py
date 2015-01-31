@@ -124,7 +124,7 @@ class ControllerIntersection(Intersection):
             if unique_id in self.failed_messages:
                 del self.messages[unique_id]  # This failed somewhere else in the chain and it was notificed already
             elif (now - start_time) > datetime.timedelta(minutes=30):
-                del self.messages[unique_id] # clean up
+                del self.messages[unique_id]  # clean up
                 self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['timeout_count'] += 1
                 self.fail(unique_id, original_process, error_message="Message timed out")
             elif ack_value > 0:

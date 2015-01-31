@@ -27,6 +27,7 @@ class Intersection(GrouperMixin, object):
         self.send_socks = {}
         self.send_grouper = None
         self.controller_sock = None
+        self.message_batch_start = datetime.datetime.now()  # This is used to time how much time messages take
 
     def _process(self, receive_sock, controller_sock=None):
 
@@ -58,6 +59,7 @@ class Intersection(GrouperMixin, object):
                 else:
                     message = Message.from_message(value, controller_sock, process_name=self.process_uuid)
                 try:
+                    self.message_batch_start = datetime.datetime.now()
                     for generated_message in self.process(message):
                         if generated_message is not None and self.send_socks:
                             socket_address = self.get_grouper(self.send_grouper)(
@@ -82,6 +84,13 @@ class Intersection(GrouperMixin, object):
 
         except Empty:  # Didn't receive anything from ZMQ
             pass
+
+    def ack(self, message):
+        message.ack(time_consumed=datetime.datetime.now() - self.message_batch_start)
+        self.message_batch_start = datetime.datetime.now()
+
+    def fail(self, message, **kwargs):
+        message.fail(**kwargs)
 
     def process(self, message):
         """
