@@ -25,5 +25,5 @@ class KinesisInsertIntersection(Intersection):
             json.dumps(message.content),
             message.grouping_value
         )
-        message.ack()
+        self.ack(message)
         yield

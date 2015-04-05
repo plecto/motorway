@@ -25,5 +25,5 @@ class SQSInsertIntersection(Intersection):
         self.queue.write(
             self.sqs_message_class(body=message.content)
         )
-        message.ack()
+        self.ack(message)
         yield

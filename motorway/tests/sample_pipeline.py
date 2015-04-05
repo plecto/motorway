@@ -42,7 +42,7 @@ class SentenceSplitIntersection(Intersection):
     def process(self, message):
         for word in message.content.split(" "):
             yield Message.new(message, word, grouping_value=word)
-        message.ack()
+        self.ack(message)
 
 
 class WordCountIntersection(Intersection):
@@ -53,7 +53,7 @@ class WordCountIntersection(Intersection):
     def process(self, messages):
         for message in messages:
             self._count[message.content] += 1
-            message.ack()
+            self.ack(message)
 
 
 class SampleWordCountPipeline(Pipeline):
