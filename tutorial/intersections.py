@@ -11,8 +11,8 @@ from motorway.intersection import Intersection
 class SentenceSplitIntersection(Intersection):
     def process(self, message):
         for word in message.content.split(" "):
-            yield Message.new(message, word, grouping_value=word)
-        message.ack()
+            yield Message(str(uuid.uuid4()), word, grouping_value=word)
+        self.ack(message)
 
 
 class WordCountIntersection(Intersection):
@@ -23,6 +23,7 @@ class WordCountIntersection(Intersection):
     @batch_process(wait=2, limit=500)
     def process(self, messages):
         for message in messages:
+            time.sleep(1)
             self._count[message.content] += 1
             self.ack(message)
         yield Message(str(uuid.uuid4()), self._count)
@@ -36,7 +37,7 @@ class AggregateIntersection(Intersection):
     def process(self, message):
         self._count.update(message.content)
         yield
-        message.ack()
+        self.ack(message)
         print self._count
 
 
