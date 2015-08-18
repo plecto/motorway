@@ -2,7 +2,6 @@ from multiprocessing import Process
 from setproctitle import setproctitle
 import time
 from motorway.controller import ControllerIntersection
-from motorway.discovery.local import LocalDiscovery
 from motorway.utils import ramp_result_stream_name
 import zmq
 import logging
@@ -12,13 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class Pipeline(object):
-    def __init__(self, discovery_backend=LocalDiscovery, controller_bind_address="0.0.0.0:7007"):
+    def __init__(self, controller_bind_address="0.0.0.0:7007"):
         self._streams = {}
         self._stream_consumers = {}
         self._processes = []
         self._queue_processes = []
         self._ramp_result_streams = []
-        self._discovery_backend = discovery_backend()
         self.controller_bind_address = "tcp://%s" % controller_bind_address
         self.context = zmq.Context()
 
