@@ -1,3 +1,4 @@
+import decimal
 from json import JSONEncoder
 import datetime
 from isodate import parse_duration, duration_isoformat, datetime_isoformat
@@ -36,6 +37,8 @@ class DateTimeAwareJsonEncoder(JSONEncoder):
             return duration_isoformat(o)
         elif type(o) == datetime.datetime:
             return datetime_isoformat(o)
+        elif isinstance(o, decimal.Decimal):
+            return float(o)
         return super(DateTimeAwareJsonEncoder, self).default(o)
 
 
