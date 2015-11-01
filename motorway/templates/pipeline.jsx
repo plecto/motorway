@@ -38,6 +38,7 @@ var Pipeline = React.createClass({
 		nodeTitle = nodeTitle.join(' ');
 		nodeData.title = nodeTitle;
 		nodeData.nodeType = nodeType;
+		nodeData.status = node[1]['status'];
 
 		var icons = {
 			'ramp': 'truck',

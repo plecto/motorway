@@ -1,6 +1,7 @@
 from multiprocessing import Process
 from setproctitle import setproctitle
 import time
+import uuid
 from motorway.controller import ControllerIntersection
 from motorway.utils import ramp_result_stream_name
 import zmq
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class Pipeline(object):
-    def __init__(self, controller_bind_address="0.0.0.0:7007"):
+    def __init__(self, controller_bind_address="0.0.0.0:7007", run_controller=True, run_webserver=True):
         self._streams = {}
         self._stream_consumers = {}
         self._processes = []
@@ -19,6 +20,8 @@ class Pipeline(object):
         self._ramp_result_streams = []
         self.controller_bind_address = "tcp://%s" % controller_bind_address
         self.context = zmq.Context()
+        self.run_controller = run_controller
+        self.run_webserver = run_webserver
 
     def definition(self):
         """
@@ -35,7 +38,7 @@ class Pipeline(object):
 
     def _add_process(self, cls, process_instances, process_args, input_stream=None, output_stream=None, show_in_ui=True, process_start_number=0):
         for i in range(process_start_number, process_instances + process_start_number):
-            process_name = "%s-%s" % (cls.__name__, i)
+            process_name = "%s-%s" % (cls.__name__, uuid.uuid4().int)
             p = Process(
                 target=cls.run,
                 args=process_args,
@@ -52,18 +55,19 @@ class Pipeline(object):
                 self._stream_consumers[input_stream]['consumers'].append(process_name)
 
     def add_ramp(self, ramp_class, output_stream, processes=1):
-        ramp_result_stream = ramp_result_stream_name(ramp_class.__name__)
-        self._ramp_result_streams.append((ramp_class.__name__, ramp_result_stream))
-        self._add_process(
-            ramp_class,
-            processes,
-            process_args=(
-                output_stream,
-                self.controller_bind_address
-            ),
-            output_stream=output_stream,
+        if processes > 1 or self.run_controller:  # TODO: Allow them to run everywhere while only running 1 at a time
+            ramp_result_stream = ramp_result_stream_name(ramp_class.__name__)
+            self._ramp_result_streams.append((ramp_class.__name__, ramp_result_stream))
+            self._add_process(
+                ramp_class,
+                processes,
+                process_args=(
+                    output_stream,
+                    self.controller_bind_address
+                ),
+                output_stream=output_stream,
 
-        )
+            )
 
     def add_intersection(self, intersection_class, input_stream, output_stream=None, processes=1, grouper_cls=None):
         self._add_process(
@@ -106,8 +110,11 @@ class Pipeline(object):
 
         # Controller Transformer
         # self._add_controller()
-        self.add_intersection(ControllerIntersection, None, '_web_server')
-        self.add_intersection(WebserverIntersection, '_web_server')
+        if self.run_controller:
+            self.add_intersection(ControllerIntersection, None, '_web_server')
+
+        if self.run_webserver:
+            self.add_intersection(WebserverIntersection, '_web_server')
 
         logger.debug("Running queues")
         for queue_process in self._queue_processes:

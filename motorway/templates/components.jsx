@@ -38,7 +38,7 @@ var NodesContainer = React.createClass({
 							<NodeCircle size={node.secondsRemaining} />
 							<div className="node-content">
 								<span className="node-icon"><span className={node.iconClass}></span></span>
-								<a href={node.url} target="_blank" className="node-name">{node.title}</a>
+								<a href={node.url} target="_blank" className="node-name">{node.title} {node.status}</a>
 								<p className="node-type">{node.nodeType}</p>
 								<div className="node-time">
 									<p className="node-time-average">x&#772;: {Utils.formatISODuration(node.avgTime)}</p>

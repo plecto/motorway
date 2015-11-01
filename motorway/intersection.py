@@ -163,7 +163,7 @@ class Intersection(GrouperMixin, object):
         # Register as consumer of input stream
         update_connection_sock = context.socket(zmq.PUSH)
         update_connection_sock.connect(connections['_update_connections']['streams'][0])
-        update_connection_sock.send_json({
+        intersection_connection_info = {
             'streams': {
                 input_queue: ['tcp://127.0.0.1:%s' % self.receive_port]
             },
@@ -172,7 +172,9 @@ class Intersection(GrouperMixin, object):
                 'name': process_name,
                 'grouping': None if not grouper_cls else grouper_cls.__name__
             }
-        })
+        }
+        update_connection_sock.send_json(intersection_connection_info)
+        last_send_time = datetime.datetime.now()
 
         connections = get_connections_block('_message_ack', refresh_connection_sock, existing_connections=connections)
         self.controller_sock = context.socket(zmq.PUSH)
@@ -186,7 +188,10 @@ class Intersection(GrouperMixin, object):
                     self.set_send_socks(connections, output_queue, context)
 
             except zmq.Again:
-                pass
+                time.sleep(1)
+            if last_send_time + datetime.timedelta(seconds=10) < datetime.datetime.now():
+                update_connection_sock.send_json(intersection_connection_info)
+                last_send_time = datetime.datetime.now()
 
     def set_send_socks(self, connections, output_queue, context):
         for send_conn in connections[output_queue]['streams']:
@@ -195,6 +200,11 @@ class Intersection(GrouperMixin, object):
                 send_sock.connect(send_conn)
                 self.send_socks[send_conn] = send_sock
                 self.send_grouper = connections[output_queue]['grouping']
+
+        deleted_connections = [connection for connection in self.send_socks.keys() if connection not in connections[output_queue]['streams']]
+        for deleted_connection in deleted_connections:
+            self.send_socks[deleted_connection].close()
+            del self.send_socks[deleted_connection]
 
     def receive_messages(self, context=None, output_stream=None, grouper_cls=None):
         receive_sock = context.socket(zmq.PULL)

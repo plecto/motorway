@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 
 class Ramp(GrouperMixin, object):
 
-    fields = []
-
     def __init__(self):
         super(Ramp, self).__init__()
         self.send_socks = {}
@@ -130,7 +128,7 @@ class Ramp(GrouperMixin, object):
         connections = get_connections_block('_update_connections', refresh_connection_sock)
         update_connection_sock = context.socket(zmq.PUSH)
         update_connection_sock.connect(connections['_update_connections']['streams'][0])
-        update_connection_sock.send_json({
+        ramp_connection_info = {
             'streams': {
                 process_id: ['tcp://127.0.0.1:%s' % self.result_port]
             },
@@ -139,12 +137,15 @@ class Ramp(GrouperMixin, object):
                 'name': process_name,
                 'grouping': None
             }
-        })
+        }
+        update_connection_sock.send_json(ramp_connection_info)
+        last_send_time = datetime.datetime.now()
 
         connections = get_connections_block('_message_ack', refresh_connection_sock)
         self.controller_sock = context.socket(zmq.PUSH)
         self.controller_sock.connect(connections['_message_ack']['streams'][0])
         set_timeouts_on_socket(self.controller_sock)
+
 
         while True:
             try:
@@ -156,8 +157,15 @@ class Ramp(GrouperMixin, object):
                             send_sock.connect(send_conn)
                             self.send_socks[send_conn] = send_sock
                             self.send_grouper = connections[queue]['grouping']
+                    deleted_connections = [connection for connection in self.send_socks.keys() if connection not in connections[queue]['streams']]
+                    for deleted_connection in deleted_connections:
+                        self.send_socks[deleted_connection].close()
+                        del self.send_socks[deleted_connection]
             except zmq.Again:
-                pass
+                time.sleep(1)
+            if last_send_time + datetime.timedelta(seconds=10) < datetime.datetime.now():
+                update_connection_sock.send_json(ramp_connection_info)
+                last_send_time = datetime.datetime.now()
 
     def message_producer(self, context=None, process_id=None):
 

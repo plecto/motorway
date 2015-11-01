@@ -1,5 +1,4 @@
-from collections import Counter
-import json
+import calendar
 import logging
 from setproctitle import setproctitle
 from threading import Thread
@@ -9,14 +8,14 @@ import uuid
 from motorway.decorators import batch_process
 from motorway.messages import Message
 from motorway.intersection import Intersection
-from motorway.utils import ramp_result_stream_name, percentile_from_dict, DateTimeAwareJsonEncoder, \
-    set_timeouts_on_socket
-from flask import Flask, render_template, Response
+from motorway.utils import percentile_from_dict, set_timeouts_on_socket
 from isodate import parse_duration
 import zmq
 
 
 logger = logging.getLogger(__name__)
+
+HEARTBEAT_TIMEOUT = 30
 
 
 def resolve_tree(stream_consumers, producer):
@@ -34,6 +33,7 @@ class ControllerIntersection(Intersection):
 
     def get_default_process_dict(self):
         return {
+            'status': 'running',
             'success': 0,
             'failed': 0,
             'processed': 0,
@@ -160,7 +160,7 @@ class ControllerIntersection(Intersection):
     def fail(self, unique_id, process, error_message=""):
         self.failed_messages[unique_id] = (process, error_message)
         if process not in self.ramp_socks:
-            logging.debug("%s not in ramp_socks, probably a intersection which doesn't support feedback. Had %s" % (process, self.ramp_socks))
+            logger.debug("%s not in ramp_socks, probably a intersection which doesn't support feedback. Had %s" % (process, self.ramp_socks))
         else:
             self.ramp_socks[process].send_json({
                 'status': 'fail',
@@ -169,7 +169,7 @@ class ControllerIntersection(Intersection):
 
     def success(self, unique_id, process):
         if process not in self.ramp_socks:
-            logging.debug("%s not in ramp_socks, probably a intersection which doesn't support feedback. Had %s" % (process, self.ramp_socks))
+            logger.debug("%s not in ramp_socks, probably a intersection which doesn't support feedback. Had %s" % (process, self.ramp_socks))
         else:
             self.ramp_socks[process].send_json({
                 'status': 'success',
@@ -187,12 +187,15 @@ class ControllerIntersection(Intersection):
 
         self.queue_processes['_update_connections'] = {
             'streams': ['tcp://127.0.0.1:%d' % update_connection_port],
-            'grouping': None
+            'grouping': None,
+            'stream_heartbeats': {}
         }
         refresh_connection_sock.send_json(self.queue_processes)  # Initial refresh
 
         poller = zmq.Poller()
         poller.register(update_connection_sock, zmq.POLLIN)
+
+        current_heartbeat = lambda: calendar.timegm(datetime.datetime.utcnow().timetuple())
 
         while True:
             socks = dict(poller.poll(timeout=10000))
@@ -203,6 +206,7 @@ class ControllerIntersection(Intersection):
                     if queue not in self.queue_processes:
                         self.queue_processes[queue] = {
                             'streams': [],
+                            'stream_heartbeats': {},
                             'grouping': None
                         }
                     for consumer in consumers:
@@ -214,6 +218,20 @@ class ControllerIntersection(Intersection):
                             if '_ramp' in queue:  # Ramp replies
                                 self.ramp_socks[queue] = self.context.socket(zmq.PUSH)
                                 self.ramp_socks[queue].connect(consumer)
+                        self.queue_processes[queue]['stream_heartbeats'][consumer] = {
+                            'heartbeat': current_heartbeat(),
+                            'process_name': connection_updates['meta']['name'],
+                            'process_id': connection_updates['meta']['id']
+                        }
+                        logging.debug("Received heartbeat from %s on queue %s - current value %s" % (consumer, queue, self.queue_processes[queue]['stream_heartbeats'][consumer]))
+            for queue, consumers in self.queue_processes.items():
+                for consumer, heartbeat_info in consumers['stream_heartbeats'].items():
+                    if current_heartbeat() > (heartbeat_info['heartbeat'] + HEARTBEAT_TIMEOUT):
+                        logger.warn("Removing %s from %s due to missing heartbeat" % (consumer, queue))
+                        self.queue_processes[queue]['streams'].remove(consumer)
+                        self.queue_processes[queue]['stream_heartbeats'].pop(consumer)
+                        self.process_statistics[heartbeat_info['process_id']]['status'] = 'failed'
+
             refresh_connection_sock.send_json(self.queue_processes)
             logger.debug("Announced %s", self.queue_processes)
             # Update our own send socks
@@ -225,7 +243,8 @@ class ControllerIntersection(Intersection):
         message_ack_port = message_ack_sock.bind_to_random_port("tcp://*")
         self.queue_processes['_message_ack'] = {
             'streams': ['tcp://127.0.0.1:%s' % message_ack_port],
-            'grouping': None
+            'grouping': None,
+            'stream_heartbeats': {}
         }
         set_timeouts_on_socket(message_ack_sock)
         while True:
