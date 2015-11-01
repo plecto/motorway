@@ -8,7 +8,7 @@ from time import time as _time
 import uuid
 import datetime
 from motorway.messages import Message
-from motorway.mixins import GrouperMixin
+from motorway.mixins import GrouperMixin, SendMessageMixin
 from motorway.utils import set_timeouts_on_socket, get_connections_block
 import zmq
 from setproctitle import setproctitle
@@ -16,7 +16,7 @@ from setproctitle import setproctitle
 logger = logging.getLogger(__name__)
 
 
-class Intersection(GrouperMixin, object):
+class Intersection(GrouperMixin, SendMessageMixin, object):
 
     fields = []
 
@@ -62,19 +62,7 @@ class Intersection(GrouperMixin, object):
                     self.message_batch_start = datetime.datetime.now()
                     for generated_message in self.process(message):
                         if generated_message is not None and self.send_socks:
-                            socket_address = self.get_grouper(self.send_grouper)(
-                                self.send_socks.keys()
-                            ).get_destination_for(generated_message.grouping_value)
-                            generated_message.send(
-                                self.send_socks[socket_address],
-                                self.process_uuid
-                            )
-                            if controller_sock:
-                                generated_message.send_control_message(
-                                    controller_sock,
-                                    process_name=self.process_uuid,
-                                    destination_endpoint=socket_address
-                                )
+                            self.send_message(generated_message, self.process_uuid)
                 except Exception as e:
                     logger.error(str(e), exc_info=True)
                     if isinstance(message, list):

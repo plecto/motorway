@@ -5,7 +5,7 @@ import datetime
 from threading import Thread
 import uuid
 from motorway.grouping import GroupingValueMissing
-from motorway.mixins import GrouperMixin
+from motorway.mixins import GrouperMixin, SendMessageMixin
 from motorway.utils import set_timeouts_on_socket, get_connections_block
 import zmq
 import time
@@ -15,7 +15,7 @@ import random
 logger = logging.getLogger(__name__)
 
 
-class Ramp(GrouperMixin, object):
+class Ramp(GrouperMixin, SendMessageMixin, object):
 
     def __init__(self):
         super(Ramp, self).__init__()
@@ -106,7 +106,7 @@ class Ramp(GrouperMixin, object):
                 thread_update_connections.start()
             if not thread_main.isAlive():
                 logger.error("Thread thread_main crashed in %s" % self.__class__.__name__)
-                thread_main = thread_results_factory()
+                thread_main = thread_main_factory()
                 thread_main.start()
             if not thread_results.isAlive():
                 logger.error("Thread thread_results crashed in %s" % self.__class__.__name__)
@@ -167,36 +167,6 @@ class Ramp(GrouperMixin, object):
                 update_connection_sock.send_json(ramp_connection_info)
                 last_send_time = datetime.datetime.now()
 
-    def message_producer(self, context=None, process_id=None):
-
-        while True:
-            if not self.send_socks:
-                logger.debug("Waiting for send_socks")
-                time.sleep(1)
-            else:
-                start_time = datetime.datetime.now()
-                for received_message_result in self:
-                    for generated_message in received_message_result:
-                        if generated_message is not None:
-                            try:
-                                socket_address = self.get_grouper(self.send_grouper)(
-                                    self.send_socks.keys()
-                                ).get_destination_for(generated_message.grouping_value)
-                            except GroupingValueMissing:
-                                raise GroupingValueMissing("Message '%s' provided an invalid grouping_value: '%s'" % (generated_message.content, generated_message.grouping_value) )
-                            generated_message.send(
-                                self.send_socks[socket_address],
-                                process_id
-                            )
-                            if self.controller_sock:
-                                generated_message.send_control_message(
-                                    self.controller_sock,
-                                    time_consumed=datetime.datetime.now() - start_time,
-                                    process_name=process_id,
-                                    destination_endpoint=socket_address
-                                )
-                        start_time = datetime.datetime.now()
-
     def receive_replies(self, context=None):
         result_sock = context.socket(zmq.PULL)
         self.result_port = result_sock.bind_to_random_port("tcp://*")
@@ -214,3 +184,26 @@ class Ramp(GrouperMixin, object):
                     logger.warn("Received unknown status feedback %s" % message_reply['status'])
             except zmq.Again:
                 time.sleep(1)
+
+    def should_run(self):
+        """
+        Subclass to define rules whether this tap should run or not. Mainly used for ensuring a tap only runs once
+         across the network
+
+        :return: bool
+        """
+        return True
+
+    def message_producer(self, context=None, process_id=None):
+
+        while True:
+            if not self.send_socks:
+                logger.debug("Waiting for send_socks")
+                time.sleep(1)
+            elif self.should_run():
+                start_time = datetime.datetime.now()
+                for received_message_result in self:
+                    for generated_message in received_message_result:
+                        if generated_message is not None:
+                            self.send_message(generated_message, process_id, time_consumed=datetime.datetime.now() - start_time)
+                        start_time = datetime.datetime.now()

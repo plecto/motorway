@@ -177,11 +177,11 @@ class ControllerIntersection(Intersection):
             })
 
     def update_connections(self, output_queue):
-        update_connection_sock = self.context.socket(zmq.PULL)
+        update_connection_sock = self.context.socket(zmq.PULL)  # The socket for receiving updates from clients
         update_connection_port = update_connection_sock.bind_to_random_port("tcp://*")
         set_timeouts_on_socket(update_connection_sock)
 
-        refresh_connection_sock = self.context.socket(zmq.PUB)
+        refresh_connection_sock = self.context.socket(zmq.PUB)  # The broadcast socket where clients subscribe to updates
         refresh_connection_sock.bind(self.controller_bind_address)
         set_timeouts_on_socket(refresh_connection_sock)
 
@@ -190,7 +190,7 @@ class ControllerIntersection(Intersection):
             'grouping': None,
             'stream_heartbeats': {}
         }
-        refresh_connection_sock.send_json(self.queue_processes)  # Initial refresh
+        refresh_connection_sock.send_json(self.queue_processes)  # Initial refresh/broadcast
 
         poller = zmq.Poller()
         poller.register(update_connection_sock, zmq.POLLIN)
