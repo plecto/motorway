@@ -41,8 +41,6 @@ class Intersection(GrouperMixin, SendMessageMixin, object):
                     socks = dict(poller.poll(timeout=1000))
                     if socks.get(receive_sock) == zmq.POLLIN:
                         value.append(receive_sock.recv_json())
-                    else:
-                        time.sleep(1)
                 self.messages_processed += len(value)
             else:
                 poller = zmq.Poller()
