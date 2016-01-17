@@ -57,10 +57,11 @@ class Intersection(GrouperMixin, SendMessageMixin, object):
                 else:
                     message = Message.from_message(value, controller_sock, process_name=self.process_uuid)
                 try:
-                    self.message_batch_start = datetime.datetime.now()
+                    start_time = datetime.datetime.now()
                     for generated_message in self.process(message):
                         if generated_message is not None and self.send_socks:
-                            self.send_message(generated_message, self.process_uuid)
+                            self.send_message(generated_message, self.process_uuid, time_consumed=datetime.datetime.now() - start_time)
+                        start_time = datetime.datetime.now()
                 except Exception as e:
                     logger.error(str(e), exc_info=True)
                     if isinstance(message, list):
@@ -72,8 +73,7 @@ class Intersection(GrouperMixin, SendMessageMixin, object):
             pass
 
     def ack(self, message):
-        message.ack(time_consumed=datetime.datetime.now() - self.message_batch_start)
-        self.message_batch_start = datetime.datetime.now()
+        message.ack()
 
     def fail(self, message, **kwargs):
         message.fail(**kwargs)
