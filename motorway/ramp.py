@@ -202,8 +202,11 @@ class Ramp(GrouperMixin, SendMessageMixin, object):
                 time.sleep(1)
             elif self.should_run():
                 start_time = datetime.datetime.now()
-                for received_message_result in self:
-                    for generated_message in received_message_result:
-                        if generated_message is not None:
-                            self.send_message(generated_message, process_id, time_consumed=datetime.datetime.now() - start_time)
-                        start_time = datetime.datetime.now()
+                try:
+                    for received_message_result in self:
+                        for generated_message in received_message_result:
+                            if generated_message is not None:
+                                self.send_message(generated_message, process_id, time_consumed=datetime.datetime.now() - start_time)
+                            start_time = datetime.datetime.now()
+                except Exception as e:  # Never let user code crash the whole thing!!
+                    logger.exception(e)
