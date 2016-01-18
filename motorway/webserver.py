@@ -14,6 +14,7 @@ class WebserverIntersection(Intersection):
         self.process_statistics = {}
         self.stream_consumers = {}
         self.failed_messages = {}
+        self.groups = {}
 
         app = Flask(__name__)
 
@@ -34,6 +35,7 @@ class WebserverIntersection(Intersection):
                     key=lambda itm: itm[0]
                 ),
                 stream_consumers=self.stream_consumers,
+                groups=self.groups,
                 last_minutes=[(now - datetime.timedelta(minutes=i)).minute for i in range(0, 10)]
             ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')
 
@@ -54,4 +56,9 @@ class WebserverIntersection(Intersection):
         self.process_statistics = message.content['process_statistics']
         self.stream_consumers = message.content['stream_consumers']
         self.failed_messages = message.content['failed_messages']
+        for process_id, stats in self.process_statistics.items():
+            group_name = self.process_id_to_name[process_id].split('-')[0]
+            new_stats = self.groups.get(group_name, {'processes': {}.copy()}.copy())
+            new_stats['processes'][process_id] = stats
+            self.groups[group_name] = new_stats
         yield
