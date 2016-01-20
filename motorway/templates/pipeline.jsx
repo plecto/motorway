@@ -2,7 +2,7 @@ var Pipeline = React.createClass({
 
 	getInitialState: function() {
 		return {
-			'nodes': []
+			'groups': []
 		}
 	},
 
@@ -11,10 +11,10 @@ var Pipeline = React.createClass({
 	},
 
 	render: function() {
-		if (this.state.nodes.length) {
+		if (Object.keys(this.state.groups).length) {
 			return (
 				<div className="pipeline">
-					<NodesContainer nodes={this.state.nodes} />
+					<GroupContainer groups={this.state.groups} />
 				</div>
 				)
 		} else {
@@ -94,7 +94,7 @@ var Pipeline = React.createClass({
 			});
 			if (that.isMounted()) {
 				that.setState({
-					'nodes': nodes,
+					'groups': data['groups'],
 					'maxHistogramValue': maxHistogramValue,
 					'lastMinutes': lastMinutes
 				});

@@ -38,7 +38,7 @@ var NodesContainer = React.createClass({
 							<NodeCircle size={node.secondsRemaining} />
 							<div className="node-content">
 								<span className="node-icon"><span className={node.iconClass}></span></span>
-								<a href={node.url} target="_blank" className="node-name">{node.title} {node.status}</a>
+								<a href={node.url} target="_blank" className="node-name">{node.title} {node.status}2</a>
 								<p className="node-type">{node.nodeType}</p>
 								<div className="node-time">
 									<p className="node-time-average">x&#772;: {Utils.formatISODuration(node.avgTime)}</p>
@@ -54,6 +54,54 @@ var NodesContainer = React.createClass({
 					</div>
 				)
 			})}
+			</div>
+		)
+	}
+});
+
+var GroupContainer = React.createClass({
+	render: function() {
+		that = this;
+		return (
+			<div className="group-container">
+			{$.map(Object.keys(that.props.groups), function (groupName) {
+			return (
+				<div className="group">
+					<h1><span className="circle-icon"><i className="fa fa-exchange"></i></span>{groupName}</h1>
+					<ul className="status-icons">
+					{$.map(Object.keys(that.props.groups[groupName]['processes']), function (processName) {
+					var process_dict =  that.props.groups[groupName]['processes'][processName];
+					return (
+						<li>
+							<div className="hidden">{processName} - {process_dict['avg_time_taken']}</div>
+							<span className="fa fa-check-circle"></span>
+							<span className="fa fa-exclamation-triangle flash"></span>
+							<span className="fa fa-cog fa-spin"></span>
+						</li>
+						)
+						})}
+					</ul>
+					<div className="status-text hidden">
+						<span className="label">Status</span>
+						<span>All good!</span>
+					</div>
+					<div className="status-text warning">
+						<span className="label">ID on the Intersection</span>
+						<span className="text">Something is wrong!</span>
+					</div>
+					<div className="stats">
+						<div className="col">
+							<span className="label">Items in queue</span>
+							300
+						</div>
+						<div className="col">
+							<span className="label">Average per item</span>
+							<span className="small">x&#772;:</span> 30s
+						</div>
+					</div>
+				</div>
+				)
+				})}
 			</div>
 		)
 	}

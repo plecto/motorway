@@ -282,3 +282,168 @@ body.disconnected #disconnected-message {
 	border-radius: 5px;
 }
 
+
+/*
+ * Group
+ * * * * * * * * * * * * * * * * * *
+*/
+
+
+.group{
+	overflow: hidden;
+	border:1px solid #2D2D2D;
+	background: #212121;
+	border-radius:0px;
+	float: left;
+	width: 25%;
+	height: 20%;
+	padding: 0.5%;
+	transition: opacity 0.5s;
+}
+
+
+.group h1{
+	margin-bottom:10px;
+	padding-bottom:10px;
+	border-bottom:1px solid #2D2D2D;
+	font-size:17px;
+}
+
+.circle-icon{
+	width:25px;
+	height:25px;
+	margin-right:1%;
+	background:#A7A7A7;
+	border-radius:40em;
+	display: inline-block;
+	text-align: center;
+	line-height:25px;
+	font-size:16px;
+	color:#212121;
+}
+
+
+/*
+ * Status icons
+ * * * * * * * * * * * * * * * * * *
+*/
+
+.status-icons{
+	list-style:none;
+	margin:0px;
+	padding:0px;
+}
+.status-icons li{
+	font-size:20px;
+	float:left;
+}
+.status-icons li span{
+	float:left;
+	margin-right:5px;
+}
+.fa-check-circle{
+	color:#199E19;
+}
+.fa-exclamation-triangle{
+	color:#BF1905;
+}
+.fa-cog{
+	color:rgb(177, 177, 177);
+}
+
+
+/*
+ * Status Text
+ * * * * * * * * * * * * * * * * * *
+*/
+
+.status-text{
+	display:block;
+	clear:both;
+	font-size:16px;
+	margin-top:10px;
+	float:left;
+}
+
+.status-text.warning{
+	color:#BF1905;
+}
+
+.label{
+	font-size:10px;
+	clear:both;
+	display: block;
+	color:#797777;
+	margin-bottom:5px;
+}
+
+
+/*
+ * Stats
+ * * * * * * * * * * * * * * * * * *
+*/
+
+.stats{
+	width:100%;
+	float:left;
+	margin-top:10px;
+	border-top:1px solid #2D2D2D;
+}
+.stats .col{
+	width:50%;
+	float:left;
+	font-size:25px;
+	padding-top:10px;
+	padding-bottom:5px;
+	border-right:1px solid #2D2D2D;
+	padding-left:10px;
+}
+.col:last-child{
+	border:0px;
+}
+
+.small{
+	font-size:18px;
+	opacity:0.7;
+}
+
+.hidden{
+	display:none;
+}
+
+/*
+ * Animations
+ * * * * * * * * * * * * * * * * * *
+*/
+
+
+@-webkit-keyframes flash {
+  from, 50%, to {
+    opacity: 1;
+  }
+
+  25%, 75% {
+    opacity: 0;
+  }
+}
+
+@keyframes flash {
+  from, 50%, to {
+    opacity: 1;
+  }
+
+  25%, 75% {
+    opacity: 0;
+  }
+}
+
+.flash{
+	-webkit-animation-duration: 1.5s;
+	animation-duration: 1.5s;
+	-webkit-animation-iteration-count:infinite;
+	animation-iteration-count:infinite;
+	-webkit-animation-fill-mode: both;
+	animation-fill-mode: both;
+	-webkit-animation-name: flash;
+	animation-name: flash;
+}
