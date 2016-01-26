@@ -97,59 +97,62 @@ var GroupContainer = React.createClass({
 						'transformer': 'green'
 					}[groupType];
 
-					var groupClass = "fa fa-" + groupIcon + ' color-' + groupColor;
+					var groupClass = "fa fa-" + groupIcon;
+					var circleClass = "circle-icon circle-icon-" + groupColor;
 
 					var avg_time = Utils.formatISODuration(Utils.getISODuration(group['avg_time_taken']));
 					return (
 						<div className="group" key={groupName} style={groupStyle}>
-							<h1><span className="circle-icon"><i className={groupClass}></i></span>{groupTitle}</h1>
-							<ul className="status-icons">
+							<div className="group-content">
+								<h1><span className={circleClass}><i className={groupClass}></i></span>{groupTitle}</h1>
+								<ul className="status-icons">
+									{$.map(Object.keys(group['processes']), function (processName) {
+										var process_dict =  group['processes'][processName];
+										var icon = '';
+										switch(process_dict['state']) {
+											case "available":
+												icon = 'fa-check-circle';
+												break;
+											case "busy":
+												icon = 'fa-cog fa-spin';
+												break;
+											case "overloaded":
+												icon = 'fa-exclamation-triangle flash';
+												break;
+										}
+										var spanClassName = 'fa ' + icon;
+										return (
+											<li key={processName}>
+												<span className={spanClassName} title={processName}></span>
+											</li>
+										)
+									})}
+								</ul>
+								<div className="status-text hidden">
+									<span className="label">Status</span>
+									<span>All good!</span>
+								</div>
 								{$.map(Object.keys(group['processes']), function (processName) {
 									var process_dict =  group['processes'][processName];
-									var icon = '';
 									switch(process_dict['state']) {
-										case "available":
-											icon = 'fa-check-circle';
-											break;
-										case "busy":
-											icon = 'fa-cog fa-spin';
-											break;
 										case "overloaded":
-											icon = 'fa-exclamation-triangle flash';
-											break;
+											return (
+												<div className="status-text warning" key={processName}>
+													<span className="label">{processName}</span>
+													<span className="text">Max capacity reached!</span>
+												</div>
+											);
 									}
-									var spanClassName = 'fa ' + icon;
-									return (
-										<li key={processName}>
-											<span className={spanClassName} title={processName}></span>
-										</li>
-									)
 								})}
-							</ul>
-							<div className="status-text hidden">
-								<span className="label">Status</span>
-								<span>All good!</span>
-							</div>
-							{$.map(Object.keys(group['processes']), function (processName) {
-								var process_dict =  group['processes'][processName];
-								switch(process_dict['state']) {
-									case "overloaded":
-										return (
-											<div className="status-text warning" key={processName}>
-												<span className="label">{processName}</span>
-												<span className="text">Max capacity reached!</span>
-											</div>
-										);
-								}
-							})}
-							<div className="stats">
-								<div className="col">
-									<span className="label">Items in queue</span>
-									{group['waiting']}
-								</div>
-								<div className="col">
-									<span className="label">Average per (received) item</span>
-									<span className="small">x&#772;:</span> {avg_time}
+								<div className="stats">
+									<div className="col">
+										<span className="label">Items in queue</span>
+										{group['waiting']}
+									</div>
+									<div className="col">
+										<span className="label">Average per (received) item</span>
+										<span className="small">x&#772;:</span> {avg_time}
+									</div>
 								</div>
 							</div>
 							<NodeGraph histogram={group['histogram']} lastMinutes={that.props.lastMinutes} />
