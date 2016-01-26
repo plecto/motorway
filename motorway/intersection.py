@@ -41,7 +41,7 @@ class Intersection(GrouperMixin, SendMessageMixin, object):
                     socks = dict(poller.poll(timeout=1000))
                     if socks.get(receive_sock) == zmq.POLLIN:
                         value.append(receive_sock.recv_json())
-                self.messages_processed += len(value)
+                message_count = len(value)
             else:
                 poller = zmq.Poller()
                 poller.register(receive_sock, zmq.POLLIN)
@@ -50,18 +50,19 @@ class Intersection(GrouperMixin, SendMessageMixin, object):
                     value = receive_sock.recv_json()
                 else:
                     return
-                self.messages_processed += 1
+                message_count = 1
             if value:
+                self.messages_processed += message_count
                 if isinstance(value, list):
                     message = [Message.from_message(m, controller_sock, process_name=self.process_uuid) for m in value]
                 else:
                     message = Message.from_message(value, controller_sock, process_name=self.process_uuid)
                 try:
-                    start_time = datetime.datetime.now()
+                    self.message_batch_start = datetime.datetime.now()
                     for generated_message in self.process(message):
                         if generated_message is not None and self.send_socks:
-                            self.send_message(generated_message, self.process_uuid, time_consumed=datetime.datetime.now() - start_time)
-                        start_time = datetime.datetime.now()
+                            self.send_message(generated_message, self.process_uuid, time_consumed=(datetime.datetime.now() - self.message_batch_start))
+                            self.message_batch_start = datetime.datetime.now()
                 except Exception as e:
                     logger.error(str(e), exc_info=True)
                     if isinstance(message, list):
@@ -73,7 +74,8 @@ class Intersection(GrouperMixin, SendMessageMixin, object):
             pass
 
     def ack(self, message):
-        message.ack()
+        message.ack(time_consumed=(datetime.datetime.now() - self.message_batch_start))
+        self.message_batch_start = datetime.datetime.now()
 
     def fail(self, message, **kwargs):
         message.fail(**kwargs)
