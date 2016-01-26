@@ -42,6 +42,7 @@ class ControllerIntersection(Intersection):
             'avg_time_taken': datetime.timedelta(seconds=0),
             '95_percentile': datetime.timedelta(seconds=0),
             'frequency': {}.copy(),
+            'total_frequency': 0,
             'histogram': {minute: {'error_count': 0, 'success_count': 0, 'timeout_count': 0}.copy() for minute in range(0, 60)}.copy()
         }.copy()
 
@@ -58,7 +59,6 @@ class ControllerIntersection(Intersection):
         self.controller_bind_address = controller_bind_address
         self.process_id_to_name = {}  # Maps UUIDs to human readable names
         self.process_address_to_uuid = {}  # Maps tcp endpoints to human readable names
-
 
     @batch_process(wait=1, limit=500)
     def process(self, messages):
@@ -110,9 +110,11 @@ class ControllerIntersection(Intersection):
                 time_taken = parse_duration(message.content['duration'])
                 rounded_seconds = round(time_taken.total_seconds(), 0)
                 self.process_statistics[current_process]['time_taken'] += time_taken
-                self.process_statistics[current_process]['frequency'][rounded_seconds] = self.process_statistics[current_process]['frequency'].get(rounded_seconds, 0) + 1
-                self.process_statistics[current_process]['95_percentile'] = datetime.timedelta(seconds=percentile_from_dict(self.process_statistics[current_process]['frequency'], 95))
-                self.process_statistics[current_process]['avg_time_taken'] = self.process_statistics[current_process]['time_taken'] / sum(self.process_statistics[current_process]['frequency'].values())
+                if ('msg_type' in message.content and message.content['msg_type'] != "new_msg") or ('sender' in message.content and message.content['sender'] == 'ramp'):
+                    self.process_statistics[current_process]['frequency'][rounded_seconds] = self.process_statistics[current_process]['frequency'].get(rounded_seconds, 0) + 1
+                    self.process_statistics[current_process]['total_frequency'] = sum(self.process_statistics[current_process]['frequency'].values())
+                    self.process_statistics[current_process]['95_percentile'] = datetime.timedelta(seconds=percentile_from_dict(self.process_statistics[current_process]['frequency'], 95))
+                    self.process_statistics[current_process]['avg_time_taken'] = self.process_statistics[current_process]['time_taken'] / sum(self.process_statistics[current_process]['frequency'].values())
         yield  # Hack: This is actually done by self.update() to trigger it even if there are no messages and to reduce messages to 1/s
 
     def update(self):
