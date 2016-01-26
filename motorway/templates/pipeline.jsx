@@ -58,45 +58,45 @@ var Pipeline = React.createClass({
 	loadState: function() {
 		var that = this;
 		$.getJSON(PipelineSettings.apiUrl, function(data) {
-			var nodes = [];
-			var maxHistogramValue = 0;
-			var lastMinutes = data['last_minutes'];
-			$.each(data['sorted_process_statistics'], function(i, node) {
-				var histogram = node[1]['histogram'];
-				$.each(data['last_minutes'], function(i, minute) {
-					var count = histogram[minute]['success_count'] + histogram[minute]['error_count'];
-					if (maxHistogramValue < count) {
-						maxHistogramValue = count;
-					}
-				});
-				nodes.push(that.getNodeData(node));
-			});
-			$.each(nodes, function(i, node) {
-				var histogram = node.histogram;
-				$.each(node.histogram, function(i, item) {
-					if (maxHistogramValue > 0) {
-						histogram[i]['success_percentage'] = (item['success_count'] / maxHistogramValue) * 100;
-						histogram[i]['error_percentage'] = (item['error_count'] / maxHistogramValue) * 100;
-						histogram[i]['timeout_percentage'] = (item['timeout_count'] / maxHistogramValue) * 100;
-					} else {
-						histogram[i]['success_percentage'] = 0;
-						histogram[i]['error_percentage'] = 0;
-						histogram[i]['timeout_percentage'] = 0;
-					}
-				});
-				node.histogram = histogram;
-				node.latestHistogram = lastMinutes.map(function(minute) {
-					return {
-						'minute': minute,
-						'value': node.histogram[minute]
-					};
-				});
-			});
+			//var nodes = [];
+			//var maxHistogramValue = 0;
+			//var lastMinutes = data['last_minutes'];
+			//$.each(data['sorted_process_statistics'], function(i, node) {
+			//	var histogram = node[1]['histogram'];
+			//	$.each(data['last_minutes'], function(i, minute) {
+			//		var count = histogram[minute]['success_count'] + histogram[minute]['error_count'];
+			//		if (maxHistogramValue < count) {
+			//			maxHistogramValue = count;
+			//		}
+			//	});
+			//	nodes.push(that.getNodeData(node));
+			//});
+			//$.each(nodes, function(i, node) {
+			//	var histogram = node.histogram;
+			//	$.each(node.histogram, function(i, item) {
+			//		if (maxHistogramValue > 0) {
+			//			histogram[i]['success_percentage'] = (item['success_count'] / maxHistogramValue) * 100;
+			//			histogram[i]['error_percentage'] = (item['error_count'] / maxHistogramValue) * 100;
+			//			histogram[i]['timeout_percentage'] = (item['timeout_count'] / maxHistogramValue) * 100;
+			//		} else {
+			//			histogram[i]['success_percentage'] = 0;
+			//			histogram[i]['error_percentage'] = 0;
+			//			histogram[i]['timeout_percentage'] = 0;
+			//		}
+			//	});
+			//	node.histogram = histogram;
+			//	node.latestHistogram = lastMinutes.map(function(minute) {
+			//		return {
+			//			'minute': minute,
+			//			'value': node.histogram[minute]
+			//		};
+			//	});
+			//});
 			if (that.isMounted()) {
 				that.setState({
 					'groups': data['groups'],
-					'maxHistogramValue': maxHistogramValue,
-					'lastMinutes': lastMinutes
+					//'maxHistogramValue': maxHistogramValue,
+					'lastMinutes': data['last_minutes']
 				});
 			}
 		})
