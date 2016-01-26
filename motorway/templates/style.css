@@ -96,12 +96,14 @@ body.disconnected #disconnected-message {
 
 #container,
 .pipeline,
-.nodes-container {
+.nodes-container,
+.groups-container {
 	width: 100%;
 	height: 100%;
 }
 
-.nodes-container {
+.nodes-container,
+.groups-container {
 	padding: 5px 0;
 }
 
@@ -295,10 +297,9 @@ body.disconnected #disconnected-message {
 	background: #212121;
 	border-radius:0px;
 	float: left;
-	width: 25%;
-	height: 20%;
 	padding: 0.5%;
 	transition: opacity 0.5s;
+	position: relative;
 }
 
 
@@ -320,6 +321,10 @@ body.disconnected #disconnected-message {
 	line-height:25px;
 	font-size:16px;
 	color:#212121;
+}
+
+.circle-icon .color-green {
+	background: green;
 }
 
 

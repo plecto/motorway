@@ -60,47 +60,101 @@ var NodesContainer = React.createClass({
 });
 
 var GroupContainer = React.createClass({
+	getGroupSize: function(count) {
+		console.log(count);
+		var ratio = 0.8;
+		var numHoriz = parseInt(Math.sqrt(count/ratio));
+		var width = 100/numHoriz;
+		var numVert = Math.ceil(count / numHoriz);
+		return [width, 100 / numVert];
+	},
 	render: function() {
-		that = this;
+		var that = this;
+		var groupSize = that.getGroupSize(Object.keys(that.props.groups).length);
+		var groupStyle = {
+			'width': groupSize[0]+'%',
+			'height': groupSize[1]+'%'
+		};
 		return (
-			<div className="group-container">
-			{$.map(Object.keys(that.props.groups), function (groupName) {
-			return (
-				<div className="group">
-					<h1><span className="circle-icon"><i className="fa fa-exchange"></i></span>{groupName}</h1>
-					<ul className="status-icons">
-					{$.map(Object.keys(that.props.groups[groupName]['processes']), function (processName) {
-					var process_dict =  that.props.groups[groupName]['processes'][processName];
+			<div className="groups-container">
+				{$.map(Object.keys(that.props.groups), function (groupName) {
+					var group = that.props.groups[groupName];
+					var groupTitle = groupName.replace(/([A-Z])/g, ' $1');
+					groupTitle = groupTitle.split('-')[0].split(' ');
+					var groupType = groupTitle.splice(groupTitle.length-1, 1).join(' ').toLowerCase();
+					groupTitle = groupTitle.join(' ');
+					var groupIcon = {
+						'ramp': 'road',
+						'intersection': 'exchange',
+						'tap': 'road',
+						'transformer': 'exchange'
+					}[groupType];
+
+					var groupColor = {
+						'ramp': 'blue',
+						'intersection': 'green',
+						'tap': 'blue',
+						'transformer': 'green'
+					}[groupType];
+
+					var groupClass = "fa fa-" + groupIcon + ' color-' + groupColor;
+
+					var avg_time = Utils.formatISODuration(Utils.getISODuration(group['avg_time_taken']));
 					return (
-						<li>
-							<div className="hidden">{processName} - {process_dict['avg_time_taken']}</div>
-							<span className="fa fa-check-circle"></span>
-							<span className="fa fa-exclamation-triangle flash"></span>
-							<span className="fa fa-cog fa-spin"></span>
-						</li>
-						)
-						})}
-					</ul>
-					<div className="status-text hidden">
-						<span className="label">Status</span>
-						<span>All good!</span>
-					</div>
-					<div className="status-text warning">
-						<span className="label">ID on the Intersection</span>
-						<span className="text">Something is wrong!</span>
-					</div>
-					<div className="stats">
-						<div className="col">
-							<span className="label">Items in queue</span>
-							300
+						<div className="group" key={groupName} style={groupStyle}>
+							<h1><span className="circle-icon"><i className={groupClass}></i></span>{groupTitle}</h1>
+							<ul className="status-icons">
+								{$.map(Object.keys(group['processes']), function (processName) {
+									var process_dict =  group['processes'][processName];
+									var icon = '';
+									switch(process_dict['state']) {
+										case "available":
+											icon = 'fa-check-circle';
+											break;
+										case "busy":
+											icon = 'fa-cog fa-spin';
+											break;
+										case "overloaded":
+											icon = 'fa-exclamation-triangle flash';
+											break;
+									}
+									var spanClassName = 'fa ' + icon;
+									return (
+										<li key={processName}>
+											<span className={spanClassName} title={processName}></span>
+										</li>
+									)
+								})}
+							</ul>
+							<div className="status-text hidden">
+								<span className="label">Status</span>
+								<span>All good!</span>
+							</div>
+							{$.map(Object.keys(group['processes']), function (processName) {
+								var process_dict =  group['processes'][processName];
+								switch(process_dict['state']) {
+									case "overloaded":
+										return (
+											<div className="status-text warning" key={processName}>
+												<span className="label">{processName}</span>
+												<span className="text">Max capacity reached!</span>
+											</div>
+										);
+								}
+							})}
+							<div className="stats">
+								<div className="col">
+									<span className="label">Items in queue</span>
+									{group['waiting']}
+								</div>
+								<div className="col">
+									<span className="label">Average per (received) item</span>
+									<span className="small">x&#772;:</span> {avg_time}
+								</div>
+							</div>
+							<NodeGraph histogram={group['histogram']} lastMinutes={that.props.lastMinutes} />
 						</div>
-						<div className="col">
-							<span className="label">Average per item</span>
-							<span className="small">x&#772;:</span> 30s
-						</div>
-					</div>
-				</div>
-				)
+					)
 				})}
 			</div>
 		)
@@ -124,9 +178,33 @@ var NodeCircle = React.createClass({
 
 var NodeGraph = React.createClass({
 	render: function() {
+		var histogram = this.props.histogram;
+
+		var maxHistogramValue = 0;
+		$.each(histogram, function(minute, item) {
+			maxHistogramValue = Math.max(maxHistogramValue, (item['success_count'] + item['error_count'] + item['timeout_count']));
+		});
+
+		$.each(histogram, function(minute, item) {
+			if (maxHistogramValue > 0) {
+				histogram[minute]['success_percentage'] = (item['success_count'] / maxHistogramValue) * 100;
+				histogram[minute]['error_percentage'] = (item['error_count'] / maxHistogramValue) * 100;
+				histogram[minute]['timeout_percentage'] = (item['timeout_count'] / maxHistogramValue) * 100;
+			} else {
+				histogram[minute]['success_percentage'] = 0;
+				histogram[minute]['error_percentage'] = 0;
+				histogram[minute]['timeout_percentage'] = 0;
+			}
+		});
+		var latestHistogram = this.props.lastMinutes.map(function(minute) {
+			return {
+				'minute': minute,
+				'value': histogram[minute]
+			};
+		});
 		return (
 			<div className="node-graph">
-				{this.props.items.map(function (item) {
+				{latestHistogram.map(function (item) {
 					var blank = {
 						'height': parseInt(100-parseInt(item.value.success_percentage)-parseInt(item.value.error_percentage)-parseInt(item.value.timeout_percentage))+'%'
 					};

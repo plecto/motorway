@@ -14,7 +14,7 @@ var Pipeline = React.createClass({
 		if (Object.keys(this.state.groups).length) {
 			return (
 				<div className="pipeline">
-					<GroupContainer groups={this.state.groups} />
+					<GroupContainer groups={this.state.groups} lastMinutes={this.state.lastMinutes} />
 				</div>
 				)
 		} else {
@@ -41,9 +41,9 @@ var Pipeline = React.createClass({
 		nodeData.status = node[1]['status'];
 
 		var icons = {
-			'ramp': 'truck',
+			'ramp': 'road',
 			'intersection': 'exchange',
-			'tap': 'truck',
+			'tap': 'road',
 			'transformer': 'exchange'
 		};
 		nodeData.iconClass = 'fa fa-'+icons[nodeType];
@@ -119,5 +119,5 @@ var Pipeline = React.createClass({
 	}
 });
 
-React.render(<Pipeline />, document.querySelector('#container'));
+ReactDOM.render(<Pipeline />, document.querySelector('#container'));
 
