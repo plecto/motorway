@@ -11,7 +11,7 @@ class GrouperMixin(object):
 
 class SendMessageMixin(object):
 
-    def send_message(self, message, process_id, time_consumed=None):
+    def send_message(self, message, process_id, time_consumed=None, sender=None):
         try:
             socket_address = self.get_grouper(self.send_grouper)(
                 self.send_socks.keys()
@@ -27,5 +27,6 @@ class SendMessageMixin(object):
                 self.controller_sock,
                 time_consumed=time_consumed,
                 process_name=process_id,
-                destination_endpoint=socket_address
+                destination_endpoint=socket_address,
+                sender=sender
             )

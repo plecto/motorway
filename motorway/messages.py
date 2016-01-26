@@ -79,7 +79,7 @@ class Message(object):
         )
 
     def send_control_message(self, controller_queue, time_consumed=None, process_name=None, destination_endpoint=None,
-                             destination_uuid=None):
+                             destination_uuid=None, sender=None):
         """
         Control messages are notifications that a new message have been created, so the controller can keep track of
         this particular message and let the ramp know once the entire tree of messages has been completed.
@@ -90,6 +90,7 @@ class Message(object):
         """
         content = {
             'process_name': process_name,
+            'msg_type': 'new_msg',
         }
         if not self.producer_uuid:
             raise Exception("Cannot send control message without producer UUID")
@@ -97,6 +98,7 @@ class Message(object):
             # Ramps provide time consumed, since we don't know the "start time" like in a intersection
             # where it's clear when the message is received and later 'acked' as the last action
             content['duration'] = duration_isoformat(time_consumed)
+            content['sender'] = sender
         controller_queue.send_json({
             'ramp_unique_id': self.ramp_unique_id,
             'ack_value': self.ack_value,
@@ -115,6 +117,7 @@ class Message(object):
             'ack_value': self.ack_value,
             'content': {
                 'process_name': self.process_name,
+                'msg_type': 'ack',
                 'duration': duration_isoformat(time_consumed or (datetime.datetime.now() - self.init_time))
             },
             'producer_uuid': self.producer_uuid,
@@ -130,6 +133,7 @@ class Message(object):
             'ack_value': -1,
             'content': {
                 'process_name': self.process_name,
+                'msg_type': 'fail',
                 'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
             },
             'producer_uuid': self.producer_uuid,
