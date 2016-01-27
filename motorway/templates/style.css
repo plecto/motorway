@@ -293,19 +293,29 @@ body.disconnected #disconnected-message {
 
 .group{
 	overflow: hidden;
-	border: 1px solid #2D2D2D;
-	background: #212121;
-	border-radius: 0;
 	float: left;
 	transition: opacity 0.5s;
 	position: relative;
+	padding: 5px;
 }
 
 .group-content {
-	padding: 0.5%;
+	background: #212121;
+	padding: 5px;
 	position: relative;
 	height: 100%;
+	border: 1px solid #2D2D2D;
+	border-radius: 0;
+}
+
+.group-content-inner {
+	position: relative;
 	z-index: 50;
+}
+
+.group .node-graph {
+	top: 50%;
+	height: 50%;
 }
 
 .group h1{
