@@ -43,7 +43,7 @@ class ControllerIntersection(Intersection):
             '95_percentile': datetime.timedelta(seconds=0),
             'frequency': {}.copy(),
             'total_frequency': 0,
-            'histogram': {minute: {'error_count': 0, 'success_count': 0, 'timeout_count': 0}.copy() for minute in range(0, 60)}.copy()
+            'histogram': {minute: {'error_count': 0, 'success_count': 0, 'timeout_count': 0, 'processed_count': 0}.copy() for minute in range(0, 60)}.copy()
         }.copy()
 
     def __init__(self, stream_consumers, context, controller_bind_address, web_server=True):
@@ -111,6 +111,7 @@ class ControllerIntersection(Intersection):
                 rounded_seconds = round(time_taken.total_seconds(), 0)
                 self.process_statistics[current_process]['time_taken'] += time_taken
                 if ('msg_type' in message.content and message.content['msg_type'] != "new_msg") or ('sender' in message.content and message.content['sender'] == 'ramp'):
+                    self.process_statistics[current_process]['histogram'][datetime.datetime.now().minute]['processed_count'] += 1
                     self.process_statistics[current_process]['frequency'][rounded_seconds] = self.process_statistics[current_process]['frequency'].get(rounded_seconds, 0) + 1
                     self.process_statistics[current_process]['total_frequency'] = sum(self.process_statistics[current_process]['frequency'].values())
                     self.process_statistics[current_process]['95_percentile'] = datetime.timedelta(seconds=percentile_from_dict(self.process_statistics[current_process]['frequency'], 95))

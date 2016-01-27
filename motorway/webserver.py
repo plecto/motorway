@@ -69,7 +69,7 @@ class WebserverIntersection(Intersection):
                     stats['state'] = 'busy'
                     processed_last_few_minutes = 0
                     for minute in self.get_last_minutes(3):
-                        processed_last_few_minutes += sum(stats['histogram'][str(minute)].values())
+                        processed_last_few_minutes += stats['histogram'][str(minute)]['processed_count']
                     if stats['waiting'] > processed_last_few_minutes:
                         stats['state'] = 'overloaded'
 
@@ -81,13 +81,14 @@ class WebserverIntersection(Intersection):
         for group in self.groups.values():
             group['waiting'] = sum([process['waiting'] for process in group['processes'].values()])
             group['time_taken'] = datetime.timedelta()
-            group['histogram'] = {str(minute): {'error_count': 0, 'success_count': 0, 'timeout_count': 0}.copy() for minute in range(0, 60)}.copy()
+            group['histogram'] = {str(minute): {'error_count': 0, 'success_count': 0, 'timeout_count': 0, 'processed_count': 0}.copy() for minute in range(0, 60)}.copy()
             for process in group['processes'].values():
                 group['time_taken'] += parse_duration(process['time_taken']) or datetime.timedelta(seconds=0)
                 for minute, histogram_dict in process['histogram'].items():
                     group['histogram'][minute]['error_count'] += histogram_dict['error_count']
                     group['histogram'][minute]['success_count'] += histogram_dict['success_count']
                     group['histogram'][minute]['timeout_count'] += histogram_dict['timeout_count']
+                    group['histogram'][minute]['processed_count'] += histogram_dict['processed_count']
                 del process['histogram']
             group['frequency'] = sum([sum(process['frequency'].values()) for process in group['processes'].values()]) or 1  # Fallback to at least one, otherwise division fails below
 
