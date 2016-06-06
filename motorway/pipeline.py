@@ -55,19 +55,19 @@ class Pipeline(object):
                 self._stream_consumers[input_stream]['consumers'].append(process_name)
 
     def add_ramp(self, ramp_class, output_stream, processes=1):
-        if processes > 1 or self.run_controller:  # TODO: Allow them to run everywhere while only running 1 at a time
-            ramp_result_stream = ramp_result_stream_name(ramp_class.__name__)
-            self._ramp_result_streams.append((ramp_class.__name__, ramp_result_stream))
-            self._add_process(
-                ramp_class,
-                processes,
-                process_args=(
-                    output_stream,
-                    self.controller_bind_address
-                ),
-                output_stream=output_stream,
+        ramp_result_stream = ramp_result_stream_name(ramp_class.__name__)
+        self._ramp_result_streams.append((ramp_class.__name__, ramp_result_stream))
+        self._add_process(
+            ramp_class,
+            processes,
+            process_args=(
+                output_stream,
+                self.controller_bind_address,
+                self.run_controller
+            ),
+            output_stream=output_stream,
 
-            )
+        )
 
     def add_intersection(self, intersection_class, input_stream, output_stream=None, processes=1, grouper_cls=None):
         self._add_process(

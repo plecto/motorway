@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 class Ramp(GrouperMixin, SendMessageMixin, object):
 
-    def __init__(self):
+    def __init__(self, runs_on_controller=False):
         super(Ramp, self).__init__()
+        self.runs_on_controller = runs_on_controller
         self.send_socks = {}
         self.send_grouper = None
         self.result_port = None
@@ -56,9 +57,9 @@ class Ramp(GrouperMixin, SendMessageMixin, object):
         pass
 
     @classmethod
-    def run(cls, queue, refresh_connection_stream=None):
+    def run(cls, queue, refresh_connection_stream=None, runs_on_controller=False):
 
-        self = cls()
+        self = cls(runs_on_controller=runs_on_controller)
 
         process_name = multiprocessing.current_process().name
         process_uuid = str(uuid.uuid4())
@@ -192,7 +193,7 @@ class Ramp(GrouperMixin, SendMessageMixin, object):
 
         :return: bool
         """
-        return True
+        return self.runs_on_controller
 
     def message_producer(self, context=None, process_id=None):
 
