@@ -1,9 +1,11 @@
+import random
 from Queue import Queue
 import json
 from threading import Thread, Lock, Semaphore
 import time
 import uuid
-from boto.dynamodb2.exceptions import ItemNotFound, ConditionalCheckFailedException
+from boto.dynamodb2.exceptions import ItemNotFound, ConditionalCheckFailedException, \
+    ProvisionedThroughputExceededException, LimitExceededException
 from boto.dynamodb2.fields import HashKey
 from boto.dynamodb2.items import Item
 from boto.dynamodb2.table import Table
@@ -12,6 +14,7 @@ from boto.exception import JSONResponseError
 from motorway.messages import Message
 from motorway.ramp import Ramp
 import boto.kinesis
+import boto.kinesis.exceptions
 import logging
 
 
@@ -20,7 +23,7 @@ shard_election_logger = logging.getLogger("motorway.contrib.amazon_kinesis.shard
 
 class KinesisRamp(Ramp):
     stream_name = None
-    heartbeat_timeout = 10  # Wait 10 seconds for a heartbeat update, or kill it
+    heartbeat_timeout = 30  # Wait 10 seconds for a heartbeat update, or kill it
 
     def __init__(self, shard_threads_enabled=True):
         super(KinesisRamp, self).__init__()
@@ -122,51 +125,56 @@ class KinesisRamp(Ramp):
     def process_shard(self, shard_id):
         while True:
             try:
-                while True:
-                    with self.semaphore:
-                        if self.can_claim_shard(shard_id):
-                            if self.claim_shard(shard_id):
-                                break
-            except ItemNotFound:
-                control_record = Item(self.control_table, data={
-                    'shard_id': shard_id,
-                    'checkpoint': 0,
-                    'worker_id': self.worker_id,
-                    'heartbeat': 0,
-                })
-                control_record.save()
+                try:
+                    while True:
+                        with self.semaphore:
+                            if self.can_claim_shard(shard_id):
+                                if self.claim_shard(shard_id):
+                                    break
+                except ItemNotFound:
+                    control_record = Item(self.control_table, data={
+                        'shard_id': shard_id,
+                        'checkpoint': 0,
+                        'worker_id': self.worker_id,
+                        'heartbeat': 0,
+                    })
+                    control_record.save()
 
 
-            control_record = self.control_table.get_item(shard_id=shard_id)
-            if control_record['checkpoint'] > 0:
-                iterator = self.conn.get_shard_iterator(
-                    self.stream_name,
-                    shard_id,
-                    "AT_SEQUENCE_NUMBER",
-                    starting_sequence_number=str(control_record['checkpoint'])
-                )['ShardIterator']
-            else:
-                iterator = self.conn.get_shard_iterator(
-                    self.stream_name,
-                    shard_id,
-                    "LATEST",
-                )['ShardIterator']
-            while True:
                 control_record = self.control_table.get_item(shard_id=shard_id)
-                if not control_record['worker_id'] == self.worker_id:
-                    shard_election_logger.info("Lost shard %s, going back to standby" % shard_id)
-                    break
-                control_record['heartbeat'] += 1
-                if len(self.uncompleted_ids[shard_id]):  # Get the "youngest" uncompleted sequence number
-                    control_record['checkpoint'] = min(self.uncompleted_ids[shard_id])
-                control_record.save()
+                if control_record['checkpoint'] > 0:
+                    iterator = self.conn.get_shard_iterator(
+                        self.stream_name,
+                        shard_id,
+                        "AT_SEQUENCE_NUMBER",
+                        starting_sequence_number=str(control_record['checkpoint'])
+                    )['ShardIterator']
+                else:
+                    iterator = self.conn.get_shard_iterator(
+                        self.stream_name,
+                        shard_id,
+                        "LATEST",
+                    )['ShardIterator']
+                while True:
+                    control_record = self.control_table.get_item(shard_id=shard_id)
+                    if not control_record['worker_id'] == self.worker_id:
+                        shard_election_logger.info("Lost shard %s, going back to standby" % shard_id)
+                        break
+                    control_record['heartbeat'] += 1
+                    if len(self.uncompleted_ids[shard_id]):  # Get the "youngest" uncompleted sequence number
+                        control_record['checkpoint'] = min(self.uncompleted_ids[shard_id])
+                    control_record.save()
 
-                result = self.conn.get_records(iterator)
-                for record in result['Records']:
-                    self.uncompleted_ids[shard_id].append(record['SequenceNumber'])
-                    self.insertion_queue.put(record)
-                iterator = result['NextShardIterator']
-                time.sleep(1)
+                    result = self.conn.get_records(iterator)
+                    for record in result['Records']:
+                        self.uncompleted_ids[shard_id].append(record['SequenceNumber'])
+                        self.insertion_queue.put(record)
+                    iterator = result['NextShardIterator']
+                    time.sleep(1)
+            except ConditionalCheckFailedException:
+                pass  # we're no longer worker for this shard
+            except (ProvisionedThroughputExceededException, LimitExceededException, boto.kinesis.exceptions.ProvisionedThroughputExceededException, boto.kinesis.exceptions.LimitExceededException) as e:
+                time.sleep(random.randrange(5, self.heartbeat_timeout))  # back off for a while
 
 
     def connection_parameters(self):
