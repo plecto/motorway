@@ -158,7 +158,7 @@ class Intersection(GrouperMixin, SendMessageMixin, object):
             'meta': {
                 'id': process_id,
                 'name': process_name,
-                'grouping': None if not grouper_cls else grouper_cls.__name__
+                'grouping': None if not grouper_cls else grouper_cls.__name__  # Specify how messages sent to this intersection should be grouped
             }
         }
         update_connection_sock.send_json(intersection_connection_info)
@@ -195,6 +195,10 @@ class Intersection(GrouperMixin, SendMessageMixin, object):
             del self.send_socks[deleted_connection]
 
     def receive_messages(self, context=None, output_stream=None, grouper_cls=None):
+        """
+        Continously read and process using _process function
+
+        """
         receive_sock = context.socket(zmq.PULL)
         self.receive_port = receive_sock.bind_to_random_port("tcp://*")
         set_timeouts_on_socket(receive_sock)
