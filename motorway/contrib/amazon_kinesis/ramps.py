@@ -131,6 +131,7 @@ class KinesisRamp(Ramp):
                             if self.can_claim_shard(shard_id):
                                 if self.claim_shard(shard_id):
                                     break
+                        time.sleep(random.randrange(2, 15))
                 except ItemNotFound:
                     control_record = Item(self.control_table, data={
                         'shard_id': shard_id,
