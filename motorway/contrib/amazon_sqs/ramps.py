@@ -9,8 +9,8 @@ class SQSRamp(Ramp):
     sqs_message_class = SQSJSONMessage
     json_group_key = None
 
-    def __init__(self):
-        super(SQSRamp, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(SQSRamp, self).__init__(*args, **kwargs)
         conn = boto.sqs.connect_to_region(**self.connection_parameters())
         assert self.queue_name, "Please define attribute queue_name on your SQSRamp"
         self.queue = conn.create_queue(self.queue_name)

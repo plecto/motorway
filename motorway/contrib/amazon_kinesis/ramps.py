@@ -25,8 +25,8 @@ class KinesisRamp(Ramp):
     stream_name = None
     heartbeat_timeout = 30  # Wait 10 seconds for a heartbeat update, or kill it
 
-    def __init__(self, shard_threads_enabled=True):
-        super(KinesisRamp, self).__init__()
+    def __init__(self, shard_threads_enabled=True, **kwargs):
+        super(KinesisRamp, self).__init__(**kwargs)
         self.conn = boto.kinesis.connect_to_region(**self.connection_parameters())
         assert self.stream_name, "Please define attribute stream_name on your KinesisRamp"
 
