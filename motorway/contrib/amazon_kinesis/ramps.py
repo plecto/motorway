@@ -4,6 +4,8 @@ import json
 from threading import Thread, Lock, Semaphore
 import time
 import uuid
+
+import datetime
 from boto.dynamodb2.exceptions import ItemNotFound, ConditionalCheckFailedException, \
     ProvisionedThroughputExceededException, LimitExceededException
 from boto.dynamodb2.fields import HashKey
@@ -14,6 +16,7 @@ from boto.exception import JSONResponseError
 from motorway.messages import Message
 from motorway.ramp import Ramp
 import boto.kinesis
+import boto.ec2.cloudwatch
 import boto.kinesis.exceptions
 import logging
 
@@ -156,6 +159,10 @@ class KinesisRamp(Ramp):
                         shard_id,
                         "LATEST",
                     )['ShardIterator']
+
+                cloudwatch = boto.ec2.cloudwatch.connect_to_region(**self.connection_parameters())
+                current_minute = lambda: datetime.datetime.now().minute
+                minute = None
                 while True:
                     control_record = self.control_table.get_item(shard_id=shard_id)
                     if not control_record['worker_id'] == self.worker_id:
@@ -170,8 +177,22 @@ class KinesisRamp(Ramp):
                     for record in result['Records']:
                         self.uncompleted_ids[shard_id].append(record['SequenceNumber'])
                         self.insertion_queue.put(record)
+                    # Push metrics to CloudWatch
                     iterator = result['NextShardIterator']
-                    time.sleep(1)
+                    delay = result['MillisBehindLatest']
+                    if minute != current_minute():  # push once per minute to CloudWatch.
+                        minute = current_minute()
+                        cloudwatch.put_metric_data(
+                            'Motorway/Kinesis',
+                            'MillisecondsBehind',
+                            value=delay,
+                            unit='Milliseconds',
+                            dimensions={
+                                'Stream': self.stream_name,
+                                'Shard': shard_id
+                            }
+                        )
+                    time.sleep(1)  # recommended pause between fetches from AWS
             except ConditionalCheckFailedException:
                 pass  # we're no longer worker for this shard
             except (ProvisionedThroughputExceededException, LimitExceededException, boto.kinesis.exceptions.ProvisionedThroughputExceededException, boto.kinesis.exceptions.LimitExceededException) as e:
