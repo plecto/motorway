@@ -3,6 +3,7 @@ from setproctitle import setproctitle
 import time
 import uuid
 from motorway.controller import ControllerIntersection
+from motorway.grouping import SendToAllGrouper
 from motorway.utils import ramp_result_stream_name
 import zmq
 import logging
@@ -83,17 +84,6 @@ class Pipeline(object):
             output_stream=output_stream,
         )
 
-    def _add_controller(self):
-        self._add_process(
-            ControllerIntersection,
-            1,
-            process_args=(
-                self.controller_bind_address,
-                self._stream_consumers,
-            ),
-            process_start_number=1
-        )
-
     def run(self):
         """
         Execute the entire pipeline in several sub processes.
@@ -114,7 +104,7 @@ class Pipeline(object):
             self.add_intersection(ControllerIntersection, None, '_web_server')
 
         if self.run_webserver:
-            self.add_intersection(WebserverIntersection, '_web_server')
+            self.add_intersection(WebserverIntersection, '_web_server', grouper_cls=SendToAllGrouper)  # all webservers should receive messages
 
         logger.debug("Running queues")
         for queue_process in self._queue_processes:

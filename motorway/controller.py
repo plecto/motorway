@@ -144,16 +144,9 @@ class ControllerIntersection(Intersection):
             'process_statistics': self.process_statistics,
             'stream_consumers': self.stream_consumers,
             'failed_messages': self.failed_messages,
-        })
+        }, grouping_value=str(self.process_uuid))
 
-        if self.send_socks:  # Send updates to webserves. Uses the same code as intersection._process - consider deduplicating it
-            socket_address = self.get_grouper(self.send_grouper)(
-                self.send_socks.keys()
-            ).get_destination_for(message.grouping_value)
-            message.send(
-                self.send_socks[socket_address],
-                self.process_uuid
-            )
+        self.send_message(message, self.process_uuid, control_message=False)
 
     def _update_wrapper(self):
         while True:
