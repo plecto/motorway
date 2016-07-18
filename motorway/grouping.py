@@ -19,6 +19,10 @@ class BaseGrouper(object):
 
 
 class HashRingGrouper(BaseGrouper):
+    """
+    Group messages based on a consistent hashing algorithm. e.g. a message with the same grouping key will always
+    go to the same intersection
+    """
     def __init__(self, *args, **kwargs):
         super(HashRingGrouper, self).__init__(*args, **kwargs)
         self.hash_ring = HashRing(self.destinations)
@@ -33,10 +37,16 @@ class HashRingGrouper(BaseGrouper):
 
 
 class RandomGrouper(BaseGrouper):
+    """
+    Select a random intersection to receive the message
+    """
     def get_destinations_for(self, value):
         return [random.choice(self.destinations)]
 
 
 class SendToAllGrouper(BaseGrouper):
+    """
+    Send messages to all intersections
+    """
     def get_destinations_for(self, value):
         return self.destinations

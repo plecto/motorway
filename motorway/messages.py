@@ -5,6 +5,7 @@ import uuid
 import datetime
 from isodate import duration_isoformat
 from motorway.utils import DateTimeAwareJsonEncoder
+import logging
 
 
 class Message(object):
@@ -56,8 +57,11 @@ class Message(object):
         :param process_name: UUID of the process processing this message (as string)
         :return:
         """
+        # assert type(message) is dict, "message (%s) should be dict" % message
+        if type(message) is not dict:
+            logging.error("Expected type dict, got type %s - message: %s", type(message), message)
         message['process_name'] = process_name
-        assert 'producer_uuid' in message, "missing uuid %s" % message
+        # assert 'producer_uuid' in message, "missing uuid %s" % message
         return cls(controller_queue=controller_queue, **message)
 
     def _message(self):
@@ -69,13 +73,16 @@ class Message(object):
             'producer_uuid': self.producer_uuid
         }
 
+    def as_json(self):
+        return json.dumps(self._message(), cls=DateTimeAwareJsonEncoder)
+
     def send(self, queue, producer_uuid=None):
         if producer_uuid and not self.producer_uuid:  # Check if provided and we didn't get one already
             self.producer_uuid = producer_uuid
         elif not self.producer_uuid:
             assert self.producer_uuid
         queue.send(
-            json.dumps(self._message(), cls=DateTimeAwareJsonEncoder)
+            self.as_json()
         )
 
     def send_control_message(self, controller_queue, time_consumed=None, process_name=None, destination_endpoint=None,

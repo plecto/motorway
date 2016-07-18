@@ -8,6 +8,8 @@ from motorway.utils import DateTimeAwareJsonEncoder
 
 
 class WebserverIntersection(Intersection):
+    send_control_messages = False
+
     def get_last_minutes(self, minute_count=10):
         now = datetime.datetime.now()
         return [(now - datetime.timedelta(minutes=i)).minute for i in range(0, minute_count)]
@@ -34,11 +36,6 @@ class WebserverIntersection(Intersection):
         @app.route("/api/status/")
         def api_status():
             return Response(json.dumps(dict(
-                # sorted_process_statistics=sorted(
-                #     [(self.process_id_to_name.get(process_id, process_id), stats) for process_id, stats in self.process_statistics.items()],
-                #     key=lambda itm: itm[0]
-                # ),
-                # stream_consumers=self.stream_consumers,
                 groups=self.groups,
                 last_minutes=self.get_last_minutes()
             ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')

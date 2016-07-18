@@ -2,6 +2,8 @@ from multiprocessing import Process
 from setproctitle import setproctitle
 import time
 import uuid
+
+from motorway.connection import ConnectionIntersection
 from motorway.controller import ControllerIntersection
 from motorway.grouping import SendToAllGrouper
 from motorway.utils import ramp_result_stream_name
@@ -13,16 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 class Pipeline(object):
-    def __init__(self, controller_bind_address="0.0.0.0:7007", run_controller=True, run_webserver=True):
+    def __init__(self, controller_bind_address="0.0.0.0:7007", run_controller=True, run_webserver=True, run_connection_discovery=True):
         self._streams = {}
         self._stream_consumers = {}
         self._processes = []
-        self._queue_processes = []
         self._ramp_result_streams = []
         self.controller_bind_address = "tcp://%s" % controller_bind_address
         self.context = zmq.Context()
         self.run_controller = run_controller
         self.run_webserver = run_webserver
+        self.run_connection_discovery = run_connection_discovery
 
     def definition(self):
         """
@@ -90,7 +92,7 @@ class Pipeline(object):
 
         """
 
-        logger.info("Starting Pipeline!")
+        logger.info("Starting Pipeline %s!" % self.__class__.__name__)
 
         setproctitle("data-pipeline: main")
 
@@ -99,21 +101,19 @@ class Pipeline(object):
         logger.debug("Loaded definition")
 
         # Controller Transformer
-        # self._add_controller()
         if self.run_controller:
-            self.add_intersection(ControllerIntersection, None, '_web_server')
+            self.add_intersection(ControllerIntersection, '_message_ack', '_web_server')
+
+        if self.run_connection_discovery:
+            self.add_intersection(ConnectionIntersection, '_update_connections')
 
         if self.run_webserver:
             self.add_intersection(WebserverIntersection, '_web_server', grouper_cls=SendToAllGrouper)  # all webservers should receive messages
 
-        logger.debug("Running queues")
-        for queue_process in self._queue_processes:
-            queue_process.start()
         logger.debug("Running pipeline")
         for process in self._processes:
             process.start()
 
-        self._processes += self._queue_processes  # Monitor queue processes and shut then down with the rest
         try:
             while True:
                 for process in self._processes:

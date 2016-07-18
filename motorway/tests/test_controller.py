@@ -15,7 +15,7 @@ class ControllerTestCase(TestCase):
 
     def setUp(self):
         ctx = zmq.Context()
-        self.controller = ControllerIntersection({}, ctx, "ipc://controller_test_case", web_server=False)
+        self.controller = ControllerIntersection()
         self.control_messages = []
         self.controller_sock = ZMQSockMock(self.control_messages)
 
@@ -130,7 +130,6 @@ class ControllerTestCase(TestCase):
         msg_in_intersection = Message.from_message(msg_in_ramp._message(), self.controller_sock, process_name=intersection_uuid)
         new_msg_in_intersection = Message(1338, "yo", producer_uuid=intersection_uuid)
         new_msg_in_intersection.send_control_message(self.controller_sock, datetime.timedelta(seconds=7), process_name=intersection_uuid, destination_uuid=intersection_uuid)
-        print "Acking"
         msg_in_intersection.ack(time_consumed=datetime.timedelta(seconds=15))
 
         self.run_controller_process_method()

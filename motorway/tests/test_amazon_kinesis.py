@@ -28,11 +28,10 @@ class MockControlTable(object):
             yield item
 
     def _put_item(self, item_data, expects=None):
-        print item_data
+        pass
 
 
 class AmazonKinesisTestCase(TestCase):
-
     def get_kinesis_ramp(self, control_table_item_list=None, shards=None):
         with patch('boto.kinesis.connect_to_region', return_value=None) as mock_method:
             KinesisRamp.stream_name = "_unittest"

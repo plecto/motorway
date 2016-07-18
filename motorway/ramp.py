@@ -5,7 +5,8 @@ import datetime
 from threading import Thread
 import uuid
 from motorway.grouping import GroupingValueMissing
-from motorway.mixins import GrouperMixin, SendMessageMixin
+from motorway.messages import Message
+from motorway.mixins import GrouperMixin, SendMessageMixin, ConnectionMixin
 from motorway.utils import set_timeouts_on_socket, get_connections_block
 import zmq
 import time
@@ -15,14 +16,22 @@ import random
 logger = logging.getLogger(__name__)
 
 
-class Ramp(GrouperMixin, SendMessageMixin, object):
+class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
+    """
+    All messages must at some point start at a ramp, which ingests data into the pipeline from an external system or
+    generates data it self (such as random words in the tutorial)
+    """
+
+    send_control_messages = True
 
     def __init__(self, runs_on_controller=False):
         super(Ramp, self).__init__()
         self.runs_on_controller = runs_on_controller
         self.send_socks = {}
         self.send_grouper = None
-        self.result_port = None
+        self.receive_port = None
+        self.process_name = multiprocessing.current_process().name
+        self.process_uuid = "_ramp-%s" % str(uuid.uuid4())
 
     def next(self):
         """
@@ -61,12 +70,9 @@ class Ramp(GrouperMixin, SendMessageMixin, object):
 
         self = cls(runs_on_controller=runs_on_controller)
 
-        process_name = multiprocessing.current_process().name
-        process_uuid = str(uuid.uuid4())
-        process_id = "_ramp-%s" % process_uuid
-        logger.info("Running %s" % process_name)
-        logger.debug("%s pushing to %s" % (process_name, queue))
-        setproctitle("data-pipeline: %s" % process_name, )
+        logger.info("Running %s" % self.process_name)
+        logger.debug("%s pushing to %s" % (self.process_name, queue))
+        setproctitle("data-pipeline: %s" % self.process_name, )
 
         context = zmq.Context()
 
@@ -75,14 +81,15 @@ class Ramp(GrouperMixin, SendMessageMixin, object):
         thread_update_connections_factory = lambda: Thread(target=self.connection_thread, name="connection_thread", kwargs={
             'refresh_connection_stream': refresh_connection_stream,
             'context': context,
-            'queue': queue,
-            'process_id': process_id,
-            'process_name': process_name,
+            'input_queue': self.process_uuid,
+            'output_queue': queue,
         })
+        #self, context=None, refresh_connection_stream=None, input_queue=None, output_queue=None, process_id=None,
+                          #process_name=None, grouper_cls=None, set_controller_sock=True
 
         thread_main_factory = lambda: Thread(target=self.message_producer, name="message_producer", kwargs={
             'context': context,
-            'process_id': process_id,
+            'process_id': self.process_uuid,
         })
 
         thread_results_factory = lambda: Thread(target=self.receive_replies, name="results", kwargs={
@@ -115,63 +122,10 @@ class Ramp(GrouperMixin, SendMessageMixin, object):
                 thread_results.start()
             time.sleep(10)
 
-    def connection_thread(self, context=None, refresh_connection_stream=None, queue=None, process_id=None,
-                          process_name=None):
-        refresh_connection_sock = context.socket(zmq.SUB)
-        refresh_connection_sock.connect(refresh_connection_stream)
-        refresh_connection_sock.setsockopt(zmq.SUBSCRIBE, '')  # You must subscribe to something, so this means *all*
-        set_timeouts_on_socket(refresh_connection_sock)
-
-        # Wait for a result port and register as consumer of input stream
-        while self.result_port is None:
-            logger.debug("Waiting for result port")
-            time.sleep(1)
-        connections = get_connections_block('_update_connections', refresh_connection_sock)
-        update_connection_sock = context.socket(zmq.PUSH)
-        update_connection_sock.connect(connections['_update_connections']['streams'][0])
-        ramp_connection_info = {
-            'streams': {
-                process_id: ['tcp://127.0.0.1:%s' % self.result_port]
-            },
-            'meta': {
-                'id': process_id,
-                'name': process_name,
-                'grouping': None
-            }
-        }
-        update_connection_sock.send_json(ramp_connection_info)
-        last_send_time = datetime.datetime.now()
-
-        connections = get_connections_block('_message_ack', refresh_connection_sock)
-        self.controller_sock = context.socket(zmq.PUSH)
-        self.controller_sock.connect(connections['_message_ack']['streams'][0])
-        set_timeouts_on_socket(self.controller_sock)
-
-
-        while True:
-            try:
-                connections = refresh_connection_sock.recv_json()
-                if queue in connections:
-                    for send_conn in connections[queue]['streams']:
-                        if send_conn not in self.send_socks:
-                            send_sock = context.socket(zmq.PUSH)
-                            send_sock.connect(send_conn)
-                            self.send_socks[send_conn] = send_sock
-                            self.send_grouper = connections[queue]['grouping']
-                    deleted_connections = [connection for connection in self.send_socks.keys() if connection not in connections[queue]['streams']]
-                    for deleted_connection in deleted_connections:
-                        self.send_socks[deleted_connection].close()
-                        del self.send_socks[deleted_connection]
-            except zmq.Again:
-                time.sleep(1)
-            if last_send_time + datetime.timedelta(seconds=10) < datetime.datetime.now():
-                update_connection_sock.send_json(ramp_connection_info)
-                last_send_time = datetime.datetime.now()
-
     def receive_replies(self, context=None):
         result_sock = context.socket(zmq.PULL)
-        self.result_port = result_sock.bind_to_random_port("tcp://*")
-        logger.debug("Result port is %s" % self.result_port)
+        self.receive_port = result_sock.bind_to_random_port("tcp://*")
+        logger.debug("Result port is %s" % self.receive_port)
         set_timeouts_on_socket(result_sock)
 
         while True:
