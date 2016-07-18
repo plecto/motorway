@@ -9,8 +9,6 @@ import random
 
 
 class WordRamp(Ramp):
-    fields = ['word']
-
     sentences = [
         "Oak is strong and also gives shade.",
         "Cats and dogs each hate the other.",
@@ -24,24 +22,30 @@ class WordRamp(Ramp):
         "Move the vat over the hot fire.",
     ]
 
-    def __init__(self):
-        super(WordRamp, self).__init__()
-        self.limit = 1000
-        self.progress = 0
+    def __init__(self, *args, **kwargs):
+        super(WordRamp, self).__init__(*args, **kwargs)
+        self.limit = 10000
+        self.progress = 1
 
     def next(self):
         # yield Message(uuid.uuid4().int, self.sentences[random.randint(0, len(self.sentences) -1)])
         if self.progress <= self.limit:
             self.progress += 1
-            yield Message(uuid.uuid4().int, self.sentences[random.randint(0, len(self.sentences) -1)])
+            # time.sleep(10)
+            sentence = self.sentences[random.randint(0, len(self.sentences) -1)]
+            yield Message(uuid.uuid4().int, sentence, grouping_value=sentence)
         else:
             time.sleep(1)
 
     def success(self, _id):
-        print "WordRamp %s was successful" % _id
+        pass
+        #print "WordRamp %s was successful" % _id
 
     def failed(self, _id):
         print "WordRamp %s has failed" % _id
+
+    def should_run(self):
+        return True
 
 
 class ExampleSQSRamp(SQSRamp):

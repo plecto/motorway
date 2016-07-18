@@ -20,12 +20,13 @@ class WordCountIntersection(Intersection):
         self._count = defaultdict(int)
         super(WordCountIntersection, self).__init__()
 
-    @batch_process(wait=2, limit=500)
+    @batch_process(wait=2, limit=5)
     def process(self, messages):
         for message in messages:
-            time.sleep(1)
+            # time.sleep(1)
             self._count[message.content] += 1
             self.ack(message)
+        # time.sleep(0.5)
         yield Message(str(uuid.uuid4()), self._count)
 
 
@@ -36,9 +37,21 @@ class AggregateIntersection(Intersection):
 
     def process(self, message):
         self._count.update(message.content)
-        yield
+        yield Message(str(uuid.uuid4()), self._count)
         self.ack(message)
-        print self._count
+
+
+class AggregateConsumerIntersection(Intersection):
+    def __init__(self):
+        self._count = defaultdict(int)
+        super(AggregateConsumerIntersection, self).__init__()
+
+    def process(self, message):
+        self._count.update(message.content)
+        self.ack(message)
+        print "Aggregate: ", self.process_uuid, self._count
+        yield
+
 
 
 class ExampleSQSIntersection(SQSInsertIntersection):

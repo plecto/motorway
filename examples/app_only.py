@@ -2,8 +2,8 @@ import logging
 from motorway.grouping import HashRingGrouper
 
 from motorway.pipeline import Pipeline
-from tutorial.ramps import WordRamp, ExampleSQSRamp, ExampleKinesisIntersection, ExampleKinesisRamp
-from tutorial.intersections import SentenceSplitIntersection, WordCountIntersection, AggregateIntersection
+from examples.ramps import WordRamp
+from examples.intersections import SentenceSplitIntersection, WordCountIntersection, AggregateIntersection
 
 
 logging.config.dictConfig({
@@ -17,7 +17,7 @@ logging.config.dictConfig({
     },
     'loggers': {
         'motorway': {
-            'level': 'DEBUG',
+            'level': 'WARN',
             'handlers': ['console'],
             'propagate': False
         },
@@ -25,8 +25,7 @@ logging.config.dictConfig({
             'level': 'WARN',
             'handlers': ['console'],
             'propagate': False,
-        },
-
+        }
     },
     'handlers': {
         'console': {
@@ -36,7 +35,7 @@ logging.config.dictConfig({
         }
     },
     'root': {
-        'level': 'INFO',
+        'level': 'DEBUG',
         'handlers': ['console']
     }
 
@@ -46,12 +45,9 @@ logging.config.dictConfig({
 class WordCountPipeline(Pipeline):
     def definition(self):
         self.add_ramp(WordRamp, 'sentence')
-        self.add_intersection(SentenceSplitIntersection, 'sentence', 'word_to_kinesis')
-        self.add_intersection(ExampleKinesisIntersection, 'word_to_kinesis')
-
-        self.add_ramp(ExampleKinesisRamp, 'word')
-        self.add_intersection(WordCountIntersection, 'word', 'word_count', grouper_cls=HashRingGrouper, processes=1)
-        self.add_intersection(AggregateIntersection, 'word_count', grouper_cls=HashRingGrouper, processes=1)
+        self.add_intersection(SentenceSplitIntersection, 'sentence', 'word', processes=2)
+        self.add_intersection(WordCountIntersection, 'word', 'word_count', grouper_cls=HashRingGrouper, processes=2)
+        self.add_intersection(AggregateIntersection, 'word_count', processes=1)
 
 
-WordCountPipeline().run()
+WordCountPipeline(run_controller=False, run_webserver=False, run_connection_discovery=False, controller_bind_address="connections:7007").run()

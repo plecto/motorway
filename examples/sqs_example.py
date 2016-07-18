@@ -1,8 +1,8 @@
 import logging
 
 from motorway.pipeline import Pipeline
-from tutorial.ramps import WordRamp, ExampleSQSRamp
-from tutorial.intersections import SentenceSplitIntersection, WordCountIntersection, ExampleSQSIntersection
+from examples.ramps import WordRamp, ExampleSQSRamp
+from examples.intersections import SentenceSplitIntersection, WordCountIntersection, ExampleSQSIntersection
 
 
 logging.basicConfig(level=logging.INFO)
