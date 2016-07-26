@@ -48,7 +48,7 @@ class ControllerIntersection(Intersection):
 
     def __init__(self, stream_consumers=None):
         super(ControllerIntersection, self).__init__()
-        self.stream_consumers = stream_consumers
+        self.stream_consumers = stream_consumers or {}
         self.ramp_socks = {}
         self.messages = {}
         self.failed_messages = {}
