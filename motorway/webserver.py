@@ -8,6 +8,13 @@ from motorway.utils import DateTimeAwareJsonEncoder
 
 
 class WebserverIntersection(Intersection):
+    """
+    Simple Flask webserver that exposes information sent from the controller(s).
+
+    It groups processes by name and furhter more sets a "status" for the different processes, based on
+    how busy they are.
+    """
+
     send_control_messages = False
 
     def get_last_minutes(self, minute_count=10):
