@@ -1,4 +1,5 @@
 var NodeGraph = require('./NodeGraph.jsx');
+var Utils = require('../utils.js');
 
 var GroupContainer = React.createClass({
 	getGroupSize: function(count) {

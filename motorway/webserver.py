@@ -36,6 +36,14 @@ class WebserverIntersection(Intersection):
         def index():
             return render_template("index.html")
 
+        @app.route("/app.js")
+        def js():
+            return Response(render_template("app.js"), mimetype='application/javascript')
+
+        @app.route("/style.css")
+        def css():
+            return Response(render_template("style.css"), mimetype='text/css')
+
         @app.route("/detail/<process>/")
         def detail(process):
             return render_template("detail.html", process=process)
@@ -45,7 +53,9 @@ class WebserverIntersection(Intersection):
             return Response(json.dumps(dict(
                 groups=self.groups,
                 last_minutes=self.get_last_minutes()
-            ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')
+            ), cls=DateTimeAwareJsonEncoder), mimetype='application/json', headers={
+                'Access-Control-Allow-Origin': '*'
+            })
 
         @app.route("/api/detail/<process>/")
         def api_detail(process):

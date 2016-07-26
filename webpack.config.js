@@ -1,5 +1,9 @@
 var webpack = require('webpack');
 
+var backendPlugin = new webpack.DefinePlugin({
+	__DEV__: JSON.stringify(JSON.parse(process.argv.indexOf('--local-dev') >= 0 || 'false'))
+});
+
 config = {
 	entry: {
 		app: ['./motorway/templates/app.jsx']
@@ -9,6 +13,7 @@ config = {
 	},
 
 	plugins: [
+		backendPlugin
 		// new webpack.optimize.UglifyJsPlugin({ output: {comments: false} }),
 		// new webpack.BannerPlugin('Motorway is an open source project by Plecto. See https://github.com/plecto/motorway/ for licensing')
 	],

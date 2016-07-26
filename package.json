@@ -16,6 +16,7 @@
     "react-dom": "^15.2.1"
   },
   "scripts": {
-    "build": "webpack -p --colors --bail"
+    "build": "webpack -p --colors --bail",
+    "dev": "webpack-dev-server --local-dev --devtool eval --progress --colors --port 8088 --content-base motorway/templates/"
   }
 }

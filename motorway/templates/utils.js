@@ -78,3 +78,5 @@ var Utils = {
 		return hours + 'h ' + minutes + 'm ' + seconds + 's';
 	}
 };
+
+module.exports = Utils;
