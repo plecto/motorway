@@ -53,7 +53,6 @@ class ControllerIntersection(Intersection):
         self.messages = {}
         self.failed_messages = {}
         self.process_statistics = {}
-        self.waiting_messages = {}
         self.queue_processes = {}
         self.process_address_to_uuid = {}  # Maps tcp endpoints to human readable names
 
@@ -130,18 +129,18 @@ class ControllerIntersection(Intersection):
                 self.fail(unique_id, original_process, error_message="Message timed out")
             elif ack_value > 0:
                 waiting_messages[process] = waiting_messages.get(process, 0) + 1
-        self.waiting_messages = waiting_messages
 
         # Update histograms
         for process in self.process_statistics.keys():
             self.process_statistics[process]['histogram'][(now + datetime.timedelta(minutes=1)).minute] = self.get_default_process_dict()['histogram'][0]  # reset next minute
-            self.process_statistics[process]['waiting'] = self.waiting_messages.get(process, 0)
+            self.process_statistics[process]['waiting'] = waiting_messages.get(process, 0)
 
+        # Prepare message but copy the dictionaries so we avoid them being changed while we send it over ZMQ
         message = Message("_controller-%s" % uuid.uuid4(), {
-            'process_id_to_name': self.process_id_to_name,
-            'process_statistics': self.process_statistics,
-            'stream_consumers': self.stream_consumers,
-            'failed_messages': self.failed_messages,
+            'process_id_to_name': self.process_id_to_name.copy(),
+            'process_statistics': self.process_statistics.copy(),
+            'stream_consumers': self.stream_consumers.copy(),
+            'failed_messages': self.failed_messages.copy(),
         }, grouping_value=str(self.process_uuid))
 
         if self.send_socks:  # if we have at least one destination, send the updates
