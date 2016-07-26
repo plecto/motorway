@@ -1,0 +1,40 @@
+version: '2'
+services:
+  web:
+    build: .
+    command: python examples/web_only.py
+    volumes:
+      - .:/code
+    ports:
+      - "5000:5000"
+    links:
+      - connections
+    depends_on:
+      - connections
+      - controller
+  controller:
+    build: .
+    command: python examples/controller_only.py
+    volumes:
+      - .:/code
+    links:
+      - connections
+    depends_on:
+    - connections
+  connections:
+    build: .
+    command: python examples/connection_only.py
+    volumes:
+      - .:/code
+    expose:
+      - "7007"
+  app:
+    build: .
+    command: python examples/app_only.py
+    volumes:
+      - .:/code
+    links:
+      - connections
+    depends_on:
+      - connections
+      - controller
