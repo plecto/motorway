@@ -153,8 +153,9 @@ class ControllerIntersection(Intersection):
         # Override to look for ramps as well, which only is relevant for controller at the moment
         for queue, queue_info in connections.items():
             if '_ramp' in queue:  # Ramp replies
-                self.ramp_socks[queue] = context.socket(zmq.PUSH)
-                self.ramp_socks[queue].connect(queue_info['streams'][0])  # There should always be exactly one stream for a ramp
+                if queue not in self.ramp_socks or not self.ramp_socks[queue]:
+                    self.ramp_socks[queue] = context.socket(zmq.PUSH)
+                    self.ramp_socks[queue].connect(queue_info['streams'][0])  # There should always be exactly one stream for a ramp
 
     def _update_wrapper(self):
         while True:
