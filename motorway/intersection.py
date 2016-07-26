@@ -112,10 +112,13 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
                             self.message_batch_start = datetime.datetime.now()
                 except Exception as e:
                     logger.error(str(e), exc_info=True)
-                    if isinstance(message, list):
-                        [m.fail() for m in message]
-                    else:
-                        message.fail()
+
+                    # Don't send control messages if e.g. web server or other system process
+                    if self.send_control_messages:
+                        if isinstance(message, list):
+                            [m.fail() for m in message]
+                        else:
+                            message.fail()
 
         except Empty:  # Didn't receive anything from ZMQ
             pass
