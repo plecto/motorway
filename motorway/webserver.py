@@ -81,12 +81,11 @@ class WebserverIntersection(Intersection):
             group['histogram'] = {str(minute): {'error_count': 0, 'success_count': 0, 'timeout_count': 0, 'processed_count': 0}.copy() for minute in range(0, 60)}.copy()
             for process in group['processes'].values():
                 group['time_taken'] += parse_duration(process['time_taken']) or datetime.timedelta(seconds=0)
-                for minute, histogram_dict in process['histogram'].items():
+                for minute, histogram_dict in process.get('histogram').items():
                     group['histogram'][minute]['error_count'] += histogram_dict['error_count']
                     group['histogram'][minute]['success_count'] += histogram_dict['success_count']
                     group['histogram'][minute]['timeout_count'] += histogram_dict['timeout_count']
                     group['histogram'][minute]['processed_count'] += histogram_dict['processed_count']
-                del process['histogram']
             group['frequency'] = sum([sum(process['frequency'].values()) for process in group['processes'].values()]) or 1  # Fallback to at least one, otherwise division fails below
 
             group['avg_time_taken'] = group['time_taken'] / group['frequency'] / len(group['processes'])
