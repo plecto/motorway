@@ -1,3 +1,5 @@
+var GroupContainer = require('./components/GroupContainer.jsx');
+
 var Pipeline = React.createClass({
 
 	getInitialState: function() {

@@ -1,0 +1,21 @@
+{
+  "name": "motorway",
+  "version": "0.0.1",
+  "private": true,
+  "devDependencies": {
+    "babel-core": "6.10.4",
+    "babel-loader": "6.2.4",
+    "babel-preset-es2015": "6.9.0",
+    "babel-preset-es2016": "6.11.3",
+    "babel-preset-react": "6.11.1",
+    "webpack": "1.13.1",
+    "webpack-dev-server": "1.14.1"
+  },
+  "dependencies": {
+    "react": "^15.2.1",
+    "react-dom": "^15.2.1"
+  },
+  "scripts": {
+    "build": "webpack -p --colors --bail"
+  }
+}
