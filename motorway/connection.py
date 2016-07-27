@@ -31,7 +31,7 @@ class ConnectionIntersection(Intersection):
     send_control_messages = False
 
     def __init__(self, bind_address='tcp://0.0.0.0:7007', **kwargs):
-        super(ConnectionIntersection, self).__init__()
+        super(ConnectionIntersection, self).__init__(**kwargs)
         self.process_statistics = {}
         self.ramp_socks = {}
         self.process_address_to_uuid = {}

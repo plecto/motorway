@@ -43,10 +43,10 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
 
     send_control_messages = True
 
-    def __init__(self):
+    def __init__(self, process_uuid=None):
         super(Intersection, self).__init__()
         self.messages_processed = 0
-        self.process_uuid = str(uuid.uuid4())
+        self.process_uuid = process_uuid.hex
         self.process_name = multiprocessing.current_process().name
         self.receive_port = None
         self.send_socks = {}
@@ -56,7 +56,7 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
         self.process_id_to_name = {}  # Maps UUIDs to human readable names
         self.process_address_to_uuid = {}
 
-    def thread_factory(self, input_stream, output_stream=None, refresh_connection_stream=None, grouper_cls=None):
+    def thread_factory(self, input_stream, output_stream=None, refresh_connection_stream=None, grouper_cls=None, process_uuid=None):
         context = zmq.Context()
 
         # Create Thread Factories :-)

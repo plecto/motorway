@@ -24,14 +24,14 @@ class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
 
     send_control_messages = True
 
-    def __init__(self, runs_on_controller=False):
+    def __init__(self, runs_on_controller=False, process_uuid=None):
         super(Ramp, self).__init__()
         self.runs_on_controller = runs_on_controller
         self.send_socks = {}
         self.send_grouper = None
         self.receive_port = None
         self.process_name = multiprocessing.current_process().name
-        self.process_uuid = "_ramp-%s" % str(uuid.uuid4())
+        self.process_uuid = "_ramp-%s" % process_uuid
 
     def next(self):
         """
@@ -66,9 +66,9 @@ class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
         pass
 
     @classmethod
-    def run(cls, queue, refresh_connection_stream=None, runs_on_controller=False):
+    def run(cls, queue, refresh_connection_stream=None, runs_on_controller=False, process_uuid=None):
 
-        self = cls(runs_on_controller=runs_on_controller)
+        self = cls(runs_on_controller=runs_on_controller, process_uuid=process_uuid)
 
         logger.info("Running %s" % self.process_name)
         logger.debug("%s pushing to %s" % (self.process_name, queue))

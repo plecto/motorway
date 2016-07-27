@@ -21,8 +21,8 @@ class WebserverIntersection(Intersection):
         now = datetime.datetime.now()
         return [(now - datetime.timedelta(minutes=i)).minute for i in range(0, minute_count)]
 
-    def __init__(self):
-        super(WebserverIntersection, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(WebserverIntersection, self).__init__(*args, **kwargs)
 
         self.process_id_to_name = {}
         self.process_statistics = {}

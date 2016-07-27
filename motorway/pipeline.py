@@ -41,10 +41,15 @@ class Pipeline(object):
 
     def _add_process(self, cls, process_instances, process_args, input_stream=None, output_stream=None, show_in_ui=True, process_start_number=0):
         for i in range(process_start_number, process_instances + process_start_number):
-            process_name = "%s-%s" % (cls.__name__, uuid.uuid4().int)
+            process_uuid = uuid.uuid4()
+            process_name = "%s-%s" % (cls.__name__, process_uuid.hex)
+            kwargs = {
+                'process_uuid': process_uuid
+            }
             p = Process(
                 target=cls.run,
                 args=process_args,
+                kwargs=kwargs,
                 name=process_name
             )
             self._processes.append(p)

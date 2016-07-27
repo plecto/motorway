@@ -17,7 +17,7 @@ class ThreadRunner(object):
 
     @classmethod
     def run(cls, *args, **kwargs):
-        self = cls()
+        self = cls(process_uuid=kwargs.get('process_uuid'))
         process_name = multiprocessing.current_process().name
         setproctitle("data-pipeline: %s" % process_name)
 

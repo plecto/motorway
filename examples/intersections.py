@@ -16,9 +16,9 @@ class SentenceSplitIntersection(Intersection):
 
 
 class WordCountIntersection(Intersection):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self._count = defaultdict(int)
-        super(WordCountIntersection, self).__init__()
+        super(WordCountIntersection, self).__init__(**kwargs)
 
     @batch_process(wait=2, limit=5)
     def process(self, messages):
@@ -31,9 +31,9 @@ class WordCountIntersection(Intersection):
 
 
 class AggregateIntersection(Intersection):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self._count = defaultdict(int)
-        super(AggregateIntersection, self).__init__()
+        super(AggregateIntersection, self).__init__(**kwargs)
 
     def process(self, message):
         self._count.update(message.content)
@@ -42,9 +42,9 @@ class AggregateIntersection(Intersection):
 
 
 class AggregateConsumerIntersection(Intersection):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self._count = defaultdict(int)
-        super(AggregateConsumerIntersection, self).__init__()
+        super(AggregateConsumerIntersection, self).__init__(**kwargs)
 
     def process(self, message):
         self._count.update(message.content)

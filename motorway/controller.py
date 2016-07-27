@@ -27,6 +27,16 @@ class ControllerIntersection(Intersection):
 
     send_control_messages = False
 
+    def __init__(self, stream_consumers=None, **kwargs):
+        super(ControllerIntersection, self).__init__(**kwargs)
+        self.stream_consumers = stream_consumers or {}
+        self.ramp_socks = {}
+        self.messages = {}
+        self.failed_messages = {}
+        self.process_statistics = {}
+        self.queue_processes = {}
+        self.process_address_to_uuid = {}  # Maps tcp endpoints to human readable names
+
     def get_default_process_dict(self):
         return {
             'status': 'running',
@@ -46,15 +56,6 @@ class ControllerIntersection(Intersection):
             }.copy()
         }.copy()
 
-    def __init__(self, stream_consumers=None):
-        super(ControllerIntersection, self).__init__()
-        self.stream_consumers = stream_consumers or {}
-        self.ramp_socks = {}
-        self.messages = {}
-        self.failed_messages = {}
-        self.process_statistics = {}
-        self.queue_processes = {}
-        self.process_address_to_uuid = {}  # Maps tcp endpoints to human readable names
 
     @batch_process(wait=1, limit=500)
     def process(self, messages):
