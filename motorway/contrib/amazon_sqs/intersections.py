@@ -7,8 +7,8 @@ class SQSInsertIntersection(Intersection):
     queue_name = None
     sqs_message_class = SQSJSONMessage
 
-    def __init__(self):
-        super(SQSInsertIntersection, self).__init__()
+    def __init__(self, **kwargs):
+        super(SQSInsertIntersection, self).__init__(**kwargs)
         conn = boto.sqs.connect_to_region(**self.connection_parameters())
         assert self.queue_name, "Please define attribute queue_name on your SQSRamp"
         self.queue = conn.create_queue(self.queue_name)

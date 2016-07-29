@@ -6,8 +6,8 @@ from motorway.intersection import Intersection
 class KinesisInsertIntersection(Intersection):
     stream_name = None
 
-    def __init__(self):
-        super(KinesisInsertIntersection, self).__init__()
+    def __init__(self, **kwargs):
+        super(KinesisInsertIntersection, self).__init__(**kwargs)
         self.conn = boto.kinesis.connect_to_region(**self.connection_parameters())
         assert self.stream_name, "Please define attribute stream_name on your KinesisInsertIntersection"
 
