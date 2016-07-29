@@ -14,6 +14,8 @@ Motorway is a real-time data pipeline, much like Apache Storm - but made in Pyth
 - No need to "upload" topologies (in particular, no need to stop the old topology before launching the new one)
 - Possibility to work tigthly with our python codebase
 - "Cloud compatible" - should be able to run in AWS Auto Scaling Groups. No manual setup required for scaling and no external requirements such as Zookeeper that also do not run very nice in the Auto Scaling Groups.
+- 
+# Extraordinary algorithm (borrowed from Storm)
 
 Motorway re-implemented the same [algorithm to store message state](https://storm.incubator.apache.org/documentation/Acking-framework-implementation.html) as Apache Storm, which is brilliant. 
 
