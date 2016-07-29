@@ -11,7 +11,7 @@ import time
 from motorway.exceptions import SocketBlockedException
 from motorway.grouping import HashRingGrouper, RandomGrouper, GroupingValueMissing, SendToAllGrouper
 from motorway.messages import Message
-from motorway.utils import set_timeouts_on_socket, get_connections_block
+from motorway.utils import set_timeouts_on_socket, get_connections_block, get_ip
 
 
 class GrouperMixin(object):
@@ -102,7 +102,7 @@ class ConnectionMixin(object):
         update_connection_sock.connect(connections['_update_connections']['streams'][0])
         intersection_connection_info = {
             'streams': {
-                input_queue: ['tcp://%s:%s' % (socket.gethostbyname(socket.gethostname()), self.receive_port)]
+                input_queue: ['tcp://%s:%s' % (get_ip(), self.receive_port)]
             },
             'meta': {
                 'id': self.process_uuid,

@@ -3,6 +3,7 @@ from json import JSONEncoder
 import datetime
 from isodate import parse_duration, duration_isoformat, datetime_isoformat
 import zmq
+import socket
 
 ramp_result_stream_name = lambda ramp_class_name: "_ramp_result_%s" % ramp_class_name
 
@@ -58,3 +59,17 @@ def get_connections_block(queue, refresh_connection_socket, limit=100, existing_
             pass
         i += 1
     return connections
+
+
+def get_ip():
+    # From http://stackoverflow.com/questions/166506/finding-local-ip-addresses-using-pythons-stdlib
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 0))
+        ip = s.getsockname()[0]
+    except:
+        ip = '127.0.0.1'
+    finally:
+        s.close()
+    return ip

@@ -5,7 +5,7 @@ import socket
 
 from motorway.intersection import Intersection
 from motorway.messages import Message
-from motorway.utils import set_timeouts_on_socket
+from motorway.utils import set_timeouts_on_socket, get_ip
 import time
 import zmq
 
@@ -74,7 +74,7 @@ class ConnectionIntersection(Intersection):
         set_timeouts_on_socket(broadcast_connection_sock)
 
         self.queue_processes['_update_connections'] = {
-            'streams': ['tcp://%s:%s' % (socket.gethostbyname(socket.gethostname()), self.receive_port)],
+            'streams': ['tcp://%s:%s' % (get_ip(), self.receive_port)],
             'grouping': None,
             'stream_heartbeats': {}
         }
