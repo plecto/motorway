@@ -22,7 +22,10 @@ var Pipeline = React.createClass({
 				)
 		} else {
 			return (
-				<div className="loader"><span className="fa fa-circle-o-notch fa-spin"></span></div>
+				<div className="loader">
+					<span className="fa fa-circle-o-notch fa-spin"></span>
+					<p>Motorway is loading...</p>
+				</div>
 			)
 		}
 	},
