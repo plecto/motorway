@@ -48,7 +48,7 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
     def __init__(self, process_uuid=None):
         super(Intersection, self).__init__()
         self.messages_processed = 0
-        self.process_uuid = process_uuid.hex
+        self.process_uuid = process_uuid.hex if process_uuid else uuid.uuid4().hex
         self.process_name = multiprocessing.current_process().name
         self.receive_port = None
         self.send_socks = {}
