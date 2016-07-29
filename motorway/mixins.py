@@ -100,7 +100,6 @@ class ConnectionMixin(object):
         # Register as consumer of input stream
         update_connection_sock = context.socket(zmq.PUSH)
         update_connection_sock.connect(connections['_update_connections']['streams'][0])
-        print("[ConnectionMixin, %s].connection_thread connecting to socket %s as PUSH" % (self.__class__.__name__, connections['_update_connections']['streams'][0]))
         intersection_connection_info = {
             'streams': {
                 input_queue: ['tcp://%s:%s' % (socket.gethostbyname(socket.gethostname()), self.receive_port)]
