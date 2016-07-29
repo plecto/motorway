@@ -3,11 +3,19 @@ motorway
 
 Tests: [![Circle CI](https://circleci.com/gh/plecto/motorway.svg?style=svg)](https://circleci.com/gh/plecto/motorway)
 
-Motorway is a real-time data pipeline, much like Apache Storm - but made in Python :-) We use it over at Plecto and we're really happy with it - but we're continously developing it. The reason why we started this project was that we wanted something similar to Storm, but without the following issues:
+Motorway is a real-time data pipeline, much like Apache Storm - but made in Python :-) We use it over at Plecto and we're really happy with it - but we're continously developing it. The reason why we started this project was that we wanted something similar to Storm, but without Zookeeper and the need to take the pipeline down to update the topology.
+
+# Epic web interface
+
+![Screenshot](https://www.dropbox.com/s/v614jtz0u1h9hrs/Screenshot%202016-07-29%2014.28.26.png?dl=1)
+
+# Amazing Selling points!
 
 - No need to "upload" topologies (in particular, no need to stop the old topology before launching the new one)
 - Possibility to work tigthly with our python codebase
 - "Cloud compatible" - should be able to run in AWS Auto Scaling Groups. No manual setup required for scaling and no external requirements such as Zookeeper that also do not run very nice in the Auto Scaling Groups.
+
+# Extraordinary algorithm
 
 Motorway re-implemented the same [algorithm to store message state](https://storm.incubator.apache.org/documentation/Acking-framework-implementation.html) as Apache Storm, which is brilliant. 
 
