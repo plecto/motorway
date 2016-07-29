@@ -5,6 +5,10 @@ Tests: [![Circle CI](https://circleci.com/gh/plecto/motorway.svg?style=svg)](htt
 
 Motorway is a real-time data pipeline, much like Apache Storm - but made in Python :-) We use it over at Plecto and we're really happy with it - but we're continously developing it. The reason why we started this project was that we wanted something similar to Storm, but without the following issues:
 
+![Screenshot](https://www.dropbox.com/s/v614jtz0u1h9hrs/Screenshot%202016-07-29%2014.28.26.png?dl=0)
+
+# Selling points!
+
 - No need to "upload" topologies (in particular, no need to stop the old topology before launching the new one)
 - Possibility to work tigthly with our python codebase
 - "Cloud compatible" - should be able to run in AWS Auto Scaling Groups. No manual setup required for scaling and no external requirements such as Zookeeper that also do not run very nice in the Auto Scaling Groups.
