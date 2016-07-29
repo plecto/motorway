@@ -1,11 +1,14 @@
 import datetime
 
 import itertools
+import random
 import socket
+import uuid
 
 import zmq
 import time
 
+from motorway.exceptions import SocketBlockedException
 from motorway.grouping import HashRingGrouper, RandomGrouper, GroupingValueMissing, SendToAllGrouper
 from motorway.messages import Message
 from motorway.utils import set_timeouts_on_socket, get_connections_block
@@ -23,7 +26,7 @@ class GrouperMixin(object):
 
 class SendMessageMixin(object):
 
-    def send_message(self, message, process_id, time_consumed=None, sender=None, control_message=True):
+    def send_message(self, message, process_id, time_consumed=None, sender=None, control_message=True, retries=100):
         """
 
         :param message: A ::pipeline.messages.Message:: instance
@@ -31,6 +34,9 @@ class SendMessageMixin(object):
         :param time_consumed:
         :param sender:
         :param control_message:
+        :param retries:
+        :type retries: int
+        :raises: SocketBlockedException, GroupingValueMissing
         :return:
         """
         try:
@@ -45,14 +51,24 @@ class SendMessageMixin(object):
                 process_id
             )
             if self.controller_sock and self.send_control_messages and control_message:
-                message.send_control_message(
-                    self.controller_sock,
-                    time_consumed=time_consumed,
-                    process_name=process_id,
-                    destination_uuid=self.process_address_to_uuid[destination],
-                    destination_endpoint=destination,
-                    sender=sender
-                )
+                for index in xrange(0, retries):
+                    try:
+                        message.send_control_message(
+                            self.controller_sock,
+                            time_consumed=time_consumed,
+                            process_name=process_id,
+                            destination_uuid=self.process_address_to_uuid[destination],
+                            destination_endpoint=destination,
+                            sender=sender
+                        )
+                        break
+                    except KeyError:  # If destination is not known, lookup fails
+                        time.sleep(random.randrange(1, 3))  # random to avoid peak loads when running multiple processes
+                    except zmq.Again:  # If connection fails, retry
+                        time.sleep(random.randrange(1, 3))
+                else:  # if for loop exited cleanly (no break)
+                    raise SocketBlockedException("Control Message for process %s could not be sent after %s attempts"
+                                                 % (process_id, retries))
 
 
 class ConnectionMixin(object):

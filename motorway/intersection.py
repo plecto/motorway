@@ -1,3 +1,4 @@
+import random
 from Queue import Empty
 import logging
 import multiprocessing
@@ -7,6 +8,7 @@ from time import time as _time
 import uuid
 import datetime
 
+from motorway.exceptions import SocketBlockedException
 from motorway.messages import Message
 from motorway.mixins import GrouperMixin, SendMessageMixin, ConnectionMixin
 from motorway.threads import ThreadRunner
@@ -123,8 +125,16 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
         except Empty:  # Didn't receive anything from ZMQ
             pass
 
-    def ack(self, message):
-        message.ack(time_consumed=(datetime.datetime.now() - self.message_batch_start))
+    def ack(self, message, retries=100):
+        for index in xrange(0, retries):
+            try:
+                message.ack(time_consumed=(datetime.datetime.now() - self.message_batch_start))
+                break
+            except zmq.Again:
+                time.sleep(random.randrange(1, 3))  # to avoid peak loads when running multiple processes
+        else:  # if for loop exited cleanly (no break)
+            raise SocketBlockedException("Acknowledge for process %s could not be sent after %s attempts" % (self.process_name, retries))
+
         self.message_batch_start = datetime.datetime.now()
 
     def fail(self, message, **kwargs):

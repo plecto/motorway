@@ -1,0 +1,2 @@
+class SocketBlockedException(BaseException):
+    pass
