@@ -23,6 +23,11 @@ Unlike with Storm where you submit a topology to an existing cluster, with Motor
 
 **New:** Now with pypy support for double speed!
 
+# Use with Django
+
+Can easily be integrated with django, if you define the pipeline (as seen below) in a management command. However, large pipelines might result in a high number of connections to your DB.
+
+
 Word Count Example
 ==================
 
