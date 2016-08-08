@@ -83,7 +83,6 @@ class DatabaseInsertIntersection(Intersection):
                     }
                 )
 
-                print stmt
 
                 if update_pks:
                     self.connection.execute(stmt, [
