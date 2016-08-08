@@ -81,7 +81,13 @@ WordCountPipeline().run()
 Integrations
 ============
 
-Pre-built support for AWS Kinesis, AWS SQS and SQLAlchemy (which means you can use a DB of your choice as a destination).
+Current list of integrations:
+
+- Salesforce (consumer, batch + real-time)
+- Recurly (consumer)
+- Amazon SQS (consumer + producer)
+- Amazon Kinesis (consumer + producer)
+
 Look in motorway/contrib/ for these addons and feel free to contribute additional ones.
 
 License
