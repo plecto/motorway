@@ -73,6 +73,12 @@ class WordCountPipeline(Pipeline):
 WordCountPipeline().run()
 ```
 
+Integrations
+============
+
+Pre-built support for AWS Kinesis, AWS SQS and SQLAlchemy (which means you can use a DB of your choice as a destination).
+Look in motorway/contrib/ for these addons and feel free to contribute additional ones.
+
 License
 =======
    Copyright 2014 Plecto ApS
