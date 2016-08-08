@@ -2,3 +2,6 @@
 sphinx
 sphinx-autobuild
 boto
+simple-salesforce
+recurly
+sqlalchemy
