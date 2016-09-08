@@ -41,7 +41,7 @@ class RecurlyAccountRamp(RecurlyRamp):
 
     def next(self):
         for account in self.recurly.Account.all():
-            yield Message(account.uuid, {
+            yield Message(account.account_code, {
                 'company_name': account.company_name,
                 'account_code': account.account_code,
             })
