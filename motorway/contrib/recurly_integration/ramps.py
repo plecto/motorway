@@ -33,6 +33,9 @@ class RecurlyInvoiceRamp(RecurlyRamp):
                 'collection_method': invoice.collection_method,
                 'currency': invoice.currency,
                 'account': invoice.account().account_code,  # TODO: Parse this from the href in the XML
+                'created_at': invoice.created_at,
+                'updated_at': invoice.updated_at,
+                'closed_at': invoice.closed_at,
             })
         time.sleep(3600)
 
