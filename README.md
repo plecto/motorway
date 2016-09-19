@@ -19,7 +19,7 @@ Motorway is a real-time data pipeline, much like Apache Storm - but made in Pyth
 
 Motorway re-implemented the same [algorithm to store message state](https://storm.incubator.apache.org/documentation/Acking-framework-implementation.html) as Apache Storm, which is brilliant. 
 
-Unlike with Storm where you submit a topology to an existing cluster, with Motorway you simply add a new node with the new code and take down the other afterwards. Motorway does not (currently) communicate across nodes, so you need something like Amazon Kinesis (included), SQS (included) or Kafka to keep track of the incoming data.
+Unlike with Storm where you submit a topology to an existing cluster, with Motorway you simply add a new node with the new code and take down the other afterwards. If you want to be able to use Motorway in a HA environment (and you probably want to), you should consider running a dedicated "master node" which only handles discovery - in that way nodes can come and go as needed.
 
 **New:** Now with pypy support for double speed!
 
