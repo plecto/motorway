@@ -87,6 +87,7 @@ Current list of integrations:
 - Recurly (consumer)
 - Amazon SQS (consumer + producer)
 - Amazon Kinesis (consumer + producer)
+- SQL Servers (via SQLAlchemy)
 
 Look in motorway/contrib/ for these addons and feel free to contribute additional ones.
 
