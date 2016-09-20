@@ -122,7 +122,7 @@ class Pipeline(object):
         try:
             while True:
                 for process in self._processes:
-                    assert process.is_alive()
+                    assert process.is_alive(), "%s died" % process
                 time.sleep(5)
         except Exception:
             raise

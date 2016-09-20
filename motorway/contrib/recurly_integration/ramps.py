@@ -33,6 +33,9 @@ class RecurlyInvoiceRamp(RecurlyRamp):
                 'collection_method': invoice.collection_method,
                 'currency': invoice.currency,
                 'account': invoice.account().account_code,  # TODO: Parse this from the href in the XML
+                'created_at': invoice.created_at,
+                'updated_at': invoice.updated_at,
+                'closed_at': invoice.closed_at,
             })
         time.sleep(3600)
 
@@ -41,7 +44,7 @@ class RecurlyAccountRamp(RecurlyRamp):
 
     def next(self):
         for account in self.recurly.Account.all():
-            yield Message(account.uuid, {
+            yield Message(account.account_code, {
                 'company_name': account.company_name,
                 'account_code': account.account_code,
             })
