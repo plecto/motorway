@@ -34,8 +34,8 @@ class DatabaseInsertIntersection(Intersection):
                 self.table = Table(self.table, self.metadata,
                     *[
                         Column(column['name'], column['type'], primary_key=column.get('primary_key', False))
-                    for column in self.table_columns]
-                )
+                    for column in self.table_columns],
+                schema = self.schema)
                 self.table.create(self.engine)
 
         super(DatabaseInsertIntersection, self).__init__(*args, **kwargs)
