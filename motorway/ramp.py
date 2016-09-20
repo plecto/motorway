@@ -23,6 +23,7 @@ class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
     """
 
     send_control_messages = True
+    sleep_time = 0
 
     def __init__(self, runs_on_controller=False, process_uuid=None):
         super(Ramp, self).__init__()
@@ -165,3 +166,5 @@ class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
                             start_time = datetime.datetime.now()
                 except Exception as e:  # Never let user code crash the whole thing!!
                     logger.exception(e)
+                if self.sleep_time:
+                    time.sleep(self.sleep_time)
