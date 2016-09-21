@@ -196,7 +196,7 @@ class KinesisRamp(Ramp):
             except ConditionalCheckFailedException:
                 pass  # we're no longer worker for this shard
             except (ProvisionedThroughputExceededException, LimitExceededException, boto.kinesis.exceptions.ProvisionedThroughputExceededException, boto.kinesis.exceptions.LimitExceededException) as e:
-                time.sleep(random.randrange(5, self.heartbeat_timeout))  # back off for a while
+                time.sleep(random.randrange(5, self.heartbeat_timeout/2))  # back off for a while
 
 
     def connection_parameters(self):
