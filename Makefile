@@ -10,7 +10,8 @@ build:
 
 upload:
 	git stash
-	python setup.py sdist upload
+	python setup.py sdist
+	twine upload dist/motorway-`cat ${PROJECT}/__init__.py | awk -F '("|")' '{ print($$2)}'`.tar.gz
 	- git stash pop
 
 git-release:
