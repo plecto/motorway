@@ -70,7 +70,7 @@ class KinesisRamp(Ramp):
             threads = []
             self.insertion_queue = Queue()
             for i, shard in enumerate(shards):
-                self.uncompleted_ids[shard['ShardId']] = []
+                self.uncompleted_ids[shard['ShardId']] = set()
                 t = Thread(target=self.process_shard, name="%s-%s" % (self.__class__.__name__, i), args=(shard['ShardId'], ))
                 threads.append(t)
                 t.start()
@@ -179,7 +179,7 @@ class KinesisRamp(Ramp):
 
                     result = self.conn.get_records(iterator)
                     for record in result['Records']:
-                        self.uncompleted_ids[shard_id].append(record['SequenceNumber'])
+                        self.uncompleted_ids[shard_id].add(record['SequenceNumber'])
                         latest_item = record['SequenceNumber']
                         self.insertion_queue.put(record)
                     # Push metrics to CloudWatch
@@ -203,7 +203,6 @@ class KinesisRamp(Ramp):
             except (ProvisionedThroughputExceededException, LimitExceededException, boto.kinesis.exceptions.ProvisionedThroughputExceededException, boto.kinesis.exceptions.LimitExceededException) as e:
                 time.sleep(random.randrange(5, self.heartbeat_timeout/2))  # back off for a while
 
-
     def connection_parameters(self):
         return {
             'region_name': 'eu-west-1',
@@ -217,6 +216,6 @@ class KinesisRamp(Ramp):
         yield Message(msg['SequenceNumber'], json.loads(msg['Data']), grouping_value=msg['PartitionKey'])
 
     def success(self, _id):
-        for shard_id, uncompleted_ids in self.uncompleted_ids.items():
+        for uncompleted_ids in self.uncompleted_ids.values():
             if _id in uncompleted_ids:
                 uncompleted_ids.remove(_id)
