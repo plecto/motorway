@@ -163,6 +163,7 @@ class KinesisRamp(Ramp):
                 cloudwatch = boto.ec2.cloudwatch.connect_to_region(**self.connection_parameters())
                 current_minute = lambda: datetime.datetime.now().minute
                 minute = None
+                latest_item = None
                 while True:
                     control_record = self.control_table.get_item(shard_id=shard_id)
                     if not control_record['worker_id'] == self.worker_id:
@@ -171,11 +172,15 @@ class KinesisRamp(Ramp):
                     control_record['heartbeat'] += 1
                     if len(self.uncompleted_ids[shard_id]):  # Get the "youngest" uncompleted sequence number
                         control_record['checkpoint'] = min(self.uncompleted_ids[shard_id])
-                    control_record.save()
+                    elif latest_item:
+                        control_record['checkpoint'] = latest_item
+
+                    control_record.save()  # Will fail if someone else modified it - ConditionalCheckFailedException
 
                     result = self.conn.get_records(iterator)
                     for record in result['Records']:
                         self.uncompleted_ids[shard_id].append(record['SequenceNumber'])
+                        latest_item = record['SequenceNumber']
                         self.insertion_queue.put(record)
                     # Push metrics to CloudWatch
                     iterator = result['NextShardIterator']
