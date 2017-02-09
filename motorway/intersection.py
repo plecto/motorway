@@ -57,6 +57,7 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
         self.message_batch_start = datetime.datetime.now()  # This is used to time how much time messages take
         self.process_id_to_name = {}  # Maps UUIDs to human readable names
         self.process_address_to_uuid = {}
+        self.grouper_instance = None
 
     def thread_factory(self, input_stream, output_stream=None, refresh_connection_stream=None, grouper_cls=None, process_uuid=None):
         context = zmq.Context()
