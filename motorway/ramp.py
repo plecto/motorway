@@ -33,6 +33,7 @@ class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
         self.receive_port = None
         self.process_name = multiprocessing.current_process().name
         self.process_uuid = "_ramp-%s" % process_uuid
+        self.grouper_instance = None
 
     def next(self):
         """
