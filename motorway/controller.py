@@ -26,6 +26,7 @@ class ControllerIntersection(Intersection):
     """
 
     send_control_messages = False
+    MESSAGE_TIMEOUT = 30  # minutes
 
     def __init__(self, stream_consumers=None, **kwargs):
         super(ControllerIntersection, self).__init__(**kwargs)
@@ -35,7 +36,6 @@ class ControllerIntersection(Intersection):
         self.failed_messages = {}
         self.process_statistics = {}
         self.queue_processes = {}
-        self.process_address_to_uuid = {}  # Maps tcp endpoints to human readable names
 
     def get_default_process_dict(self):
         return {
@@ -118,13 +118,19 @@ class ControllerIntersection(Intersection):
     def update(self):
         now = datetime.datetime.now()
 
+        process_uuid_to_address = {uuid: address for address, uuid in self.process_address_to_uuid.items()}
+
         # Check message status
         waiting_messages = {}
         for unique_id, lst in self.messages.items():
             original_process, ack_value, start_time, process = lst
             if unique_id in self.failed_messages:
                 del self.messages[unique_id]  # This failed somewhere else in the chain and it was notificed already
-            elif (now - start_time) > datetime.timedelta(minutes=30):
+            elif process not in process_uuid_to_address:
+                del self.messages[unique_id]  # clean up
+                self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['timeout_count'] += 1
+                self.fail(unique_id, original_process, error_message="Assigned processed disappeared")
+            elif (now - start_time) > datetime.timedelta(minutes=self.MESSAGE_TIMEOUT):
                 del self.messages[unique_id]  # clean up
                 self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['timeout_count'] += 1
                 self.fail(unique_id, original_process, error_message="Message timed out")
