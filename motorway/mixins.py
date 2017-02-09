@@ -40,9 +40,7 @@ class SendMessageMixin(object):
         :return:
         """
         try:
-            socket_addresses = self.get_grouper(self.send_grouper)(
-                self.send_socks.keys()
-            ).get_destinations_for(message.grouping_value)
+            socket_addresses = self.grouper_instance.get_destinations_for(message.grouping_value)
         except GroupingValueMissing:
             raise GroupingValueMissing("Message '%s' provided an invalid grouping_value: '%s'" % (message.content, message.grouping_value))
         for destination in socket_addresses:
@@ -84,6 +82,11 @@ class ConnectionMixin(object):
         for deleted_connection in deleted_connections:
             self.send_socks[deleted_connection].close()
             del self.send_socks[deleted_connection]
+
+        # initialize grouper again with new socks
+        self.grouper_instance = self.get_grouper(self.send_grouper)(
+            self.send_socks.keys()
+        )
 
     def connection_thread(self, context=None, refresh_connection_stream=None, input_queue=None, output_queue=None,
                           grouper_cls=None, set_controller_sock=True):

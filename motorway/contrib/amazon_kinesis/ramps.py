@@ -27,6 +27,7 @@ shard_election_logger = logging.getLogger("motorway.contrib.amazon_kinesis.shard
 class KinesisRamp(Ramp):
     stream_name = None
     heartbeat_timeout = 30  # Wait 10 seconds for a heartbeat update, or kill it
+    MAX_UNCOMPLETED_ITEMS = 3000
 
     def __init__(self, shard_threads_enabled=True, **kwargs):
         super(KinesisRamp, self).__init__(**kwargs)
@@ -144,7 +145,6 @@ class KinesisRamp(Ramp):
                     })
                     control_record.save()
 
-
                 control_record = self.control_table.get_item(shard_id=shard_id)
                 if control_record['checkpoint'] > 0:
                     iterator = self.conn.get_shard_iterator(
@@ -178,12 +178,21 @@ class KinesisRamp(Ramp):
                     control_record.save()  # Will fail if someone else modified it - ConditionalCheckFailedException
 
                     result = self.conn.get_records(iterator)
-                    for record in result['Records']:
-                        self.uncompleted_ids[shard_id].add(record['SequenceNumber'])
-                        latest_item = record['SequenceNumber']
-                        self.insertion_queue.put(record)
+                    if len(self.uncompleted_ids) < self.MAX_UNCOMPLETED_ITEMS:
+                        for record in result['Records']:
+                            self.uncompleted_ids[shard_id].add(record['SequenceNumber'])
+                            latest_item = record['SequenceNumber']
+                            self.insertion_queue.put(record)
+                        iterator = result['NextShardIterator']
+                    else:
+                        iterator = self.conn.get_shard_iterator(
+                            self.stream_name,
+                            shard_id,
+                            "AT_SEQUENCE_NUMBER",
+                            starting_sequence_number=str(control_record['checkpoint'])
+                        )['ShardIterator']
+
                     # Push metrics to CloudWatch
-                    iterator = result['NextShardIterator']
                     delay = result['MillisBehindLatest']
                     if minute != current_minute():  # push once per minute to CloudWatch.
                         minute = current_minute()

@@ -37,3 +37,4 @@ class SQSRamp(Ramp):
 
     def success(self, _id):
         self.queue.delete_message(self.messages[_id])  # TODO: Do this on ack
+        del self.messages[_id]
