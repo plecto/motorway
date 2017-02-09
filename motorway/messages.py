@@ -141,11 +141,12 @@ class Message(object):
             'content': {
                 'process_name': self.process_name,
                 'msg_type': 'fail',
-                'duration': duration_isoformat(datetime.datetime.now() - self.init_time)
+                'duration': duration_isoformat(datetime.datetime.now() - self.init_time),
+                'message_content': self.content
             },
             'producer_uuid': self.producer_uuid,
             'destination_uuid': self.producer_uuid,
-            'error_message': error_message if not capture_exception else traceback.format_exc()
+            'error_message': error_message if not capture_exception else traceback.format_exc(),
         })
 
     def __repr__(self):

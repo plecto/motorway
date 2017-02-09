@@ -99,7 +99,12 @@ class ControllerIntersection(Intersection):
                     del self.messages[message.ramp_unique_id]
                 self.process_statistics[original_process]['failed'] += 1
                 self.process_statistics[original_process]['histogram'][datetime.datetime.now().minute]['error_count'] += 1
-                self.fail(message.ramp_unique_id, error_message=message.error_message, process=original_process)
+                self.fail(
+                    message.ramp_unique_id,
+                    error_message=message.error_message,
+                    process=original_process,
+                    message_content=message.content['message_content']
+                )
             self.process_statistics[original_process]['processed'] += 1
 
             # Update statistics
@@ -168,8 +173,9 @@ class ControllerIntersection(Intersection):
             self.update()
             time.sleep(1)
 
-    def fail(self, unique_id, process, error_message=""):
-        self.failed_messages[unique_id] = (process, error_message)
+    def fail(self, unique_id, process, error_message="", message_content=None):
+        # Use tuple because we will be transmitting them over JSON on large quantities and dict is too verbose
+        self.failed_messages[unique_id] = (datetime.datetime.now(), process, error_message, message_content)
         if process not in self.ramp_socks and '_ramp' in process:
             logger.warn("%s not in ramp_socks. Had %s" % (process, self.ramp_socks))
         elif process in self.ramp_socks:

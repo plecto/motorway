@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+	<meta charset="UTF-8" />
+	<meta http-equiv="x-ua-compatible" content="ie=edge,chrome=1" />
+	<meta name="viewport" content="user-scalable=0,initial-scale=1.0,minimal-ui" />
+	<title>Pipeline Stats</title>
+	<link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
+	<link href="/style.css" rel="stylesheet">
+	<script src="https://code.jquery.com/jquery-1.11.2.min.js"></script>
+</head>
+<body>
+	<h1>{{ process }}</h1>
+    <h2>Errors</h2>
+    <table width="100%">
+        <tr>
+            <th>Date</th>
+            <th>Message</th>
+            <th>Exception</th>
+        </tr>
+        {% for date, process, exception, message in failed_messages %}
+            <tr>
+                <td>{{ date }}</td>
+                <td><pre>{{ message }}</pre></td>
+                <td><pre>{{ exception }}</pre></td>
+            </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

@@ -46,7 +46,13 @@ class WebserverIntersection(Intersection):
 
         @app.route("/detail/<process>/")
         def detail(process):
-            return render_template("detail.html", process=process)
+            return render_template(
+                "detail.html",
+                process=process,
+                failed_messages=reversed(sorted([msg for msg in self.failed_messages.values() if
+                                 msg[1] == process], key=lambda itm: itm[0])[-20:]),
+
+            )
 
         @app.route("/api/status/")
         def api_status():
@@ -57,11 +63,11 @@ class WebserverIntersection(Intersection):
                 'Access-Control-Allow-Origin': '*'
             })
 
-        @app.route("/api/detail/<process>/")
-        def api_detail(process):
-            return Response(json.dumps(dict(
-                failed_messages=[msg[1] for msg in self.failed_messages.values() if self.process_id_to_name[msg[0]] == process],
-            ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')
+        # @app.route("/api/detail/<process>/")
+        # def api_detail(process):
+        #     return Response(json.dumps(dict(
+        #         failed_messages=[msg[1] for msg in self.failed_messages.values() if self.process_id_to_name[msg[0]] == process],
+        #     ), cls=DateTimeAwareJsonEncoder), mimetype='application/json')
 
         p = Thread(target=app.run, name="motorway-webserver", kwargs=dict(
             port=5000,

@@ -64,9 +64,12 @@ var GroupContainer = React.createClass({
 													break;
 											}
 											var spanClassName = 'fa ' + icon;
+											var url = '/detail/' + processName + '/';
 											return (
 												<li key={processName}>
-													<span className={spanClassName} title={processName}></span>
+													<a href={url}>
+														<span className={spanClassName} title={processName}></span>
+													</a>
 												</li>
 											)
 										})}
