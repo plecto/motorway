@@ -28,6 +28,7 @@ class KinesisRamp(Ramp):
     stream_name = None
     heartbeat_timeout = 30  # Wait 10 seconds for a heartbeat update, or kill it
     MAX_UNCOMPLETED_ITEMS = 3000
+    GET_RECORDS_LIMIT = 1000
 
     def __init__(self, shard_threads_enabled=True, **kwargs):
         super(KinesisRamp, self).__init__(**kwargs)
@@ -177,7 +178,7 @@ class KinesisRamp(Ramp):
 
                     control_record.save()  # Will fail if someone else modified it - ConditionalCheckFailedException
 
-                    result = self.conn.get_records(iterator)
+                    result = self.conn.get_records(iterator, limit=self.GET_RECORDS_LIMIT)
                     if len(self.uncompleted_ids) < self.MAX_UNCOMPLETED_ITEMS:
                         for record in result['Records']:
                             self.uncompleted_ids[shard_id].add(record['SequenceNumber'])
