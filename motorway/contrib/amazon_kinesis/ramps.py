@@ -130,6 +130,7 @@ class KinesisRamp(Ramp):
     def process_shard(self, shard_id):
         while True:
             try:
+                # try to claim the shard
                 try:
                     while True:
                         with self.semaphore:
@@ -138,6 +139,7 @@ class KinesisRamp(Ramp):
                                     break
                         time.sleep(random.randrange(2, 15))
                 except ItemNotFound:
+                    # no record for this shard found, nobody ever claimed the shard yet, so claim it
                     control_record = Item(self.control_table, data={
                         'shard_id': shard_id,
                         'checkpoint': 0,
@@ -146,8 +148,10 @@ class KinesisRamp(Ramp):
                     })
                     control_record.save()
 
+                # get initial iterator
                 control_record = self.control_table.get_item(shard_id=shard_id)
                 if control_record['checkpoint'] > 0:
+                    # if we have a checkpoint, start from the checkpoint
                     iterator = self.conn.get_shard_iterator(
                         self.stream_name,
                         shard_id,
@@ -155,6 +159,7 @@ class KinesisRamp(Ramp):
                         starting_sequence_number=str(control_record['checkpoint'])
                     )['ShardIterator']
                 else:
+                    # we have no checkpoint stored, start from the latest item in Kinesis
                     iterator = self.conn.get_shard_iterator(
                         self.stream_name,
                         shard_id,
@@ -166,26 +171,37 @@ class KinesisRamp(Ramp):
                 minute = None
                 latest_item = None
                 while True:
-                    control_record = self.control_table.get_item(shard_id=shard_id)
+                    control_record = self.control_table.get_item(shard_id=shard_id)  # always retrieve this at the top of the loop
+
+                    # if the shard was claimed by another worker, break out of the loop
                     if not control_record['worker_id'] == self.worker_id:
                         shard_election_logger.info("Lost shard %s, going back to standby" % shard_id)
                         break
+
+                    # update the heartbeat and the checkpoint
                     control_record['heartbeat'] += 1
-                    if len(self.uncompleted_ids[shard_id]):  # Get the "youngest" uncompleted sequence number
+                    if len(self.uncompleted_ids[shard_id]):
+                        # Get the "youngest" uncompleted sequence number
                         control_record['checkpoint'] = min(self.uncompleted_ids[shard_id])
                     elif latest_item:
+                        # or the latest item we yielded
                         control_record['checkpoint'] = latest_item
-
                     control_record.save()  # Will fail if someone else modified it - ConditionalCheckFailedException
 
+                    # get records from Kinesis, using the previously created iterator
                     result = self.conn.get_records(iterator, limit=self.GET_RECORDS_LIMIT)
+
                     if len(self.uncompleted_ids) < self.MAX_UNCOMPLETED_ITEMS:
+                        # insert the records into the queue, and use the provided iterator for the next loop
                         for record in result['Records']:
                             self.uncompleted_ids[shard_id].add(record['SequenceNumber'])
                             latest_item = record['SequenceNumber']
                             self.insertion_queue.put(record)
                         iterator = result['NextShardIterator']
                     else:
+                        # we have too many uncompleted items, so back off for a while
+                        # however, the iterator needs to be updated, because it expires after a while
+                        # use the latest record we added to the queue as the starting point
                         next_iterator_number = latest_item if latest_item else str(control_record['checkpoint'])
                         iterator = self.conn.get_shard_iterator(
                             self.stream_name,
@@ -208,7 +224,9 @@ class KinesisRamp(Ramp):
                                 'Shard': shard_id
                             }
                         )
-                    time.sleep(1)  # recommended pause between fetches from AWS
+
+                    # recommended pause between fetches from AWS
+                    time.sleep(1)
             except ConditionalCheckFailedException:
                 pass  # we're no longer worker for this shard
             except (ProvisionedThroughputExceededException, LimitExceededException, boto.kinesis.exceptions.ProvisionedThroughputExceededException, boto.kinesis.exceptions.LimitExceededException) as e:
