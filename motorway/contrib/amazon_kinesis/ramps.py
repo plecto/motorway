@@ -186,11 +186,12 @@ class KinesisRamp(Ramp):
                             self.insertion_queue.put(record)
                         iterator = result['NextShardIterator']
                     else:
+                        next_iterator_number = latest_item if latest_item else str(control_record['checkpoint'])
                         iterator = self.conn.get_shard_iterator(
                             self.stream_name,
                             shard_id,
                             "AT_SEQUENCE_NUMBER",
-                            starting_sequence_number=str(control_record['checkpoint'])
+                            starting_sequence_number=next_iterator_number
                         )['ShardIterator']
 
                     # Push metrics to CloudWatch
