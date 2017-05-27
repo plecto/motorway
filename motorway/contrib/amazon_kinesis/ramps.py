@@ -94,10 +94,10 @@ class KinesisRamp(Ramp):
         heartbeat = control_record['heartbeat']
         time.sleep(self.heartbeat_timeout)
         if heartbeat == self.control_table.get_item(shard_id=shard_id)['heartbeat']:  # TODO: check worker_id as well
-            shard_election_logger.debug("Heartbeat remained unchanged for defined time, taking over")
+            shard_election_logger.debug("Shard %s - heartbeat remained unchanged for defined time, taking over" % shard_id)
             return True
         else:
-            shard_election_logger.debug("Heartbeat changed, continue sleeping")
+            shard_election_logger.debug("Shard %s - Heartbeat changed, continue sleeping" % shard_id)
         # Balance, if possible
         active_workers = {
             self.worker_id: True
@@ -120,9 +120,18 @@ class KinesisRamp(Ramp):
         workers = set([shard['worker_id'] for shard in shards])
         shards_per_worker = {worker: sum([1 for shard in shards if shard['worker_id'] == worker]) for worker in workers}
         for shard in shards:
-            if shards_per_worker.get(shard['worker_id'], 0) > optimal_number_of_shards_per_worker:
-                if shards_per_worker.get(self.worker_id, 0) < optimal_number_of_shards_per_worker:
-                    if shard['shard_id'] == shard_id:
+            if shard['shard_id'] == shard_id:
+                if (
+                    # Check if the shards current worker has too many, or if the worker has no workers, then take
+                    # the shard if the current worker has more than one shard!
+                        shards_per_worker.get(shard['worker_id'], 0) > optimal_number_of_shards_per_worker or (
+                                    shards_per_worker.get(self.worker_id, 0) == 0 and
+                                    shards_per_worker.get(shard['worker_id'], 0) > 1
+                                )
+                ) and (
+                    # Only get shards for balancing purposes, if we have too little
+                        shards_per_worker.get(self.worker_id, 0) < optimal_number_of_shards_per_worker
+                ):
                         shard_election_logger.debug("Taking over %s from %s" % (shard_id, shard['worker_id']))
                         return True
         return False
