@@ -17,8 +17,8 @@ class KinesisInsertIntersection(Intersection):
         return {
             'region_name': 'eu-west-1',
             # Add this or use ENV VARS
-            #'aws_access_key_id': '',
-            #'aws_secret_access_key': ''
+            # 'aws_access_key_id': '',
+            # 'aws_secret_access_key': ''
         }
 
     @batch_process(limit=500, wait=1)
