@@ -3,6 +3,8 @@ import boto.kinesis
 from motorway.decorators import batch_process
 from motorway.intersection import Intersection
 from time import sleep
+import logging
+logger = logging.getLogger(__name__)
 
 
 class KinesisInsertIntersection(Intersection):
@@ -30,6 +32,9 @@ class KinesisInsertIntersection(Intersection):
         Each shard can support writes up to 1,000 records per second, up to a maximum data write total of 1 MB per second.
         This means we can run 2 intersections (2 x 500 records) submitting to the same shard before hitting the write limit (1000 records/sec)
         If we hit the write limit we wait 2 seconds and try to send the records that failed again, rinse and repeat
+        If any other error than ProvisionedThroughputExceededException (only InternalFailure is currently supported) is returned in the response
+        we log it using loglevel error and dump the message for replayability instead of raising an exception that would drop the whole batch.
+        So if you are going to use this intersection in production be sure to monitor and handle the messages with log level error!
         :param messages: 
         :return: 
         """
@@ -41,7 +46,11 @@ class KinesisInsertIntersection(Intersection):
         failed_records = []
         for i, record in enumerate(response['Records']):
             if len(record.get('ErrorCode', '')) > 0:
-                failed_records.append(messages[i])
+                if record['ErrorCode'] != 'ProvisionedThroughputExceededException':
+                    s = '%s for message: %s' % (record['ErrorMessage'], json.dumps(messages[i]))
+                    logger.error(s)
+                else:
+                    failed_records.append(messages[i])
             else:
                 self.ack(messages[i])
 
