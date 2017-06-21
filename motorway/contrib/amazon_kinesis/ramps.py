@@ -69,7 +69,7 @@ class KinesisRamp(Ramp):
             )
 
             shards = self.conn.describe_stream(self.stream_name)['StreamDescription']['Shards']
-            shards = random.shuffle(shards)  # Start the threads in random order, in case of bulk restart
+            random.shuffle(shards)  # Start the threads in random order, in case of bulk restart
             threads = []
             self.insertion_queue = Queue()
             for i, shard in enumerate(shards):
