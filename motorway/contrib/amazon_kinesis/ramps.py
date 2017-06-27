@@ -254,7 +254,10 @@ class KinesisRamp(Ramp):
 
     def next(self):
         msg = self.insertion_queue.get()
-        yield Message(msg['SequenceNumber'], json.loads(msg['Data']), grouping_value=msg['PartitionKey'])
+        try:
+            yield Message(msg['SequenceNumber'], json.loads(msg['Data']), grouping_value=msg['PartitionKey'])
+        except ValueError as e:
+            logger.exception(e)
 
     def success(self, _id):
         for uncompleted_ids in self.uncompleted_ids.values():
