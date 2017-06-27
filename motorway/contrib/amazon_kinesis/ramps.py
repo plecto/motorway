@@ -23,6 +23,7 @@ import logging
 
 shard_election_logger = logging.getLogger("motorway.contrib.amazon_kinesis.shard_election")
 
+logger = logging.getLogger(__name__)
 
 class KinesisRamp(Ramp):
     stream_name = None
@@ -209,6 +210,7 @@ class KinesisRamp(Ramp):
                             self.insertion_queue.put(record)
                         iterator = result['NextShardIterator']
                     else:
+                        logger.debug("Pausing, too many uncompleted items (%s/%s)" % (len(self.uncompleted_ids), self.MAX_UNCOMPLETED_ITEMS))
                         # we have too many uncompleted items, so back off for a while
                         # however, the iterator needs to be updated, because it expires after a while
                         # use the latest record we added to the queue as the starting point
