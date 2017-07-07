@@ -199,10 +199,10 @@ class KinesisRamp(Ramp):
                         control_record['checkpoint'] = latest_item
                     control_record.save()  # Will fail if someone else modified it - ConditionalCheckFailedException
 
-                    # get records from Kinesis, using the previously created iterator
-                    result = self.conn.get_records(iterator, limit=self.GET_RECORDS_LIMIT)
-
                     if len(self.uncompleted_ids[shard_id]) < self.MAX_UNCOMPLETED_ITEMS:
+                        # get records from Kinesis, using the previously created iterator
+                        result = self.conn.get_records(iterator, limit=self.GET_RECORDS_LIMIT)
+
                         # insert the records into the queue, and use the provided iterator for the next loop
                         for record in result['Records']:
                             self.uncompleted_ids[shard_id].add(record['SequenceNumber'])
@@ -222,6 +222,9 @@ class KinesisRamp(Ramp):
                             starting_sequence_number=next_iterator_number
                         )['ShardIterator']
 
+                        # get just one item to update the MillisBehindLatest below
+                        result = self.conn.get_records(iterator, limit=1)
+
                     # Push metrics to CloudWatch
                     delay = result['MillisBehindLatest']
                     if minute != current_minute():  # push once per minute to CloudWatch.
@@ -239,9 +242,11 @@ class KinesisRamp(Ramp):
 
                     # recommended pause between fetches from AWS
                     time.sleep(1)
-            except ConditionalCheckFailedException:
+            except ConditionalCheckFailedException as e:
+                logger.warning(e)
                 pass  # we're no longer worker for this shard
             except (ProvisionedThroughputExceededException, LimitExceededException, boto.kinesis.exceptions.ProvisionedThroughputExceededException, boto.kinesis.exceptions.LimitExceededException) as e:
+                logger.warning(e)
                 time.sleep(random.randrange(5, self.heartbeat_timeout/2))  # back off for a while
 
     def connection_parameters(self):
