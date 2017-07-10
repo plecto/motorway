@@ -23,7 +23,7 @@ class KinesisInsertIntersection(Intersection):
             # 'aws_secret_access_key': ''
         }
 
-    @batch_process(limit=500, wait=1)
+    @batch_process(limit=500, wait=3)
     def process(self, messages):
         """
         wait 1 second and get up to 500 items 
@@ -49,13 +49,15 @@ class KinesisInsertIntersection(Intersection):
                 if record['ErrorCode'] != 'ProvisionedThroughputExceededException':
                     s = '%s for message: %s' % (record['ErrorMessage'], json.dumps(messages[i]))
                     logger.error(s)
+                    self.fail(messages[i])
                 else:
+                    logger.warning(record['ErrorCode'])
                     failed_records.append(messages[i])
             else:
                 self.ack(messages[i])
 
         if len(failed_records) > 0:
-            sleep(2)
+            sleep(1)
             self.process(failed_records)
 
         yield
