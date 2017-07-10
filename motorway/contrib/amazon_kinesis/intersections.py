@@ -23,7 +23,7 @@ class KinesisInsertIntersection(Intersection):
             # 'aws_secret_access_key': ''
         }
 
-    @batch_process(limit=500, wait=3)
+    @batch_process(limit=500, wait=1)
     def process(self, messages):
         """
         wait 1 second and get up to 500 items 
@@ -42,22 +42,29 @@ class KinesisInsertIntersection(Intersection):
         for message in messages:
             kinesis_record = {'PartitionKey': message.grouping_value, 'Data': json.dumps(message.content)}
             records.append(kinesis_record)
-        response = self.conn.put_records(records, self.stream_name)
-        failed_records = []
-        for i, record in enumerate(response['Records']):
-            if len(record.get('ErrorCode', '')) > 0:
-                if record['ErrorCode'] != 'ProvisionedThroughputExceededException':
-                    s = '%s for message: %s' % (record['ErrorMessage'], json.dumps(messages[i]))
-                    logger.error(s)
-                    self.fail(messages[i])
-                else:
-                    logger.warning(record['ErrorCode'])
-                    failed_records.append(messages[i])
-            else:
-                self.ack(messages[i])
 
-        if len(failed_records) > 0:
-            sleep(1)
-            self.process(failed_records)
+        while len(records) > 0:
+            logger.debug('put %s records' % len(records))
+            response = self.conn.put_records(records, self.stream_name)
+            records = []
+            for i, record in enumerate(response['Records']):
+                if len(record.get('ErrorCode', '')) > 0:
+                    if record['ErrorCode'] == 'ProvisionedThroughputExceededException':
+                        # retry when throttled
+                        logger.warning(record['ErrorCode'])
+                        kinesis_record = {'PartitionKey': messages[i].grouping_value, 'Data': json.dumps(messages[i].content)}
+                        records.append(kinesis_record)
+                    else:
+                        # fail on any other exception
+                        logger.error(record['ErrorMessage'])
+                        self.fail(messages[i])
+                else:
+                    # success
+                    self.ack(messages[i])
+
+            if len(records) > 0:
+                # wait to not get throttled again
+                logger.warning('%s records were throttled, sleeping and re-trying...' % len(records))
+                sleep(1)
 
         yield
