@@ -52,7 +52,8 @@ class KinesisInsertIntersection(Intersection):
                     if record['ErrorCode'] == 'ProvisionedThroughputExceededException':
                         # retry when throttled
                         logger.warning(record['ErrorCode'])
-                        records.append(messages[i])
+                        kinesis_record = {'PartitionKey': messages[i].grouping_value, 'Data': json.dumps(messages[i].content)}
+                        records.append(kinesis_record)
                     else:
                         # fail on any other exception
                         logger.error(record['ErrorMessage'])
