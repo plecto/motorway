@@ -25,6 +25,7 @@ shard_election_logger = logging.getLogger("motorway.contrib.amazon_kinesis.shard
 
 logger = logging.getLogger(__name__)
 
+
 class KinesisRamp(Ramp):
     stream_name = None
     heartbeat_timeout = 30  # Wait 10 seconds for a heartbeat update, or kill it
@@ -36,7 +37,7 @@ class KinesisRamp(Ramp):
         self.conn = boto.kinesis.connect_to_region(**self.connection_parameters())
         assert self.stream_name, "Please define attribute stream_name on your KinesisRamp"
 
-        control_table_name = 'pipeline-control-%s' % self.stream_name
+        control_table_name = self.get_control_table_name()
 
         self.worker_id = str(uuid.uuid4())
         self.semaphore = Semaphore()
@@ -78,6 +79,9 @@ class KinesisRamp(Ramp):
                 t = Thread(target=self.process_shard, name="%s-%s" % (self.__class__.__name__, i), args=(shard['ShardId'], ))
                 threads.append(t)
                 t.start()
+
+    def get_control_table_name(self):
+        return 'pipeline-control-%s' % self.stream_name
 
     def claim_shard(self, shard_id):
         shard_election_logger.info("Claiming shard %s" % shard_id)
