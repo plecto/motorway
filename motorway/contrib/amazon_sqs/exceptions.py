@@ -1,0 +1,3 @@
+
+class SQSMessageToLarge(Exception):
+    pass
