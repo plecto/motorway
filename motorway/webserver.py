@@ -1,10 +1,13 @@
 import datetime
 import json
+import logging
 from threading import Thread
 from flask import Flask, render_template, Response
 from isodate import parse_duration
 from motorway.intersection import Intersection
 from motorway.utils import DateTimeAwareJsonEncoder
+
+logger = logging.getLogger(__name__)
 
 
 class WebserverIntersection(Intersection):
@@ -24,7 +27,6 @@ class WebserverIntersection(Intersection):
     def __init__(self, *args, **kwargs):
         super(WebserverIntersection, self).__init__(*args, **kwargs)
 
-        self.process_id_to_name = {}
         self.process_statistics = {}
         self.stream_consumers = {}
         self.failed_messages = {}
@@ -76,7 +78,6 @@ class WebserverIntersection(Intersection):
         p.start()
 
     def process(self, message):
-        self.process_id_to_name = message.content['process_id_to_name']
         self.process_statistics = message.content['process_statistics']
         self.stream_consumers = message.content['stream_consumers']
         self.failed_messages = message.content['failed_messages']
@@ -102,7 +103,14 @@ class WebserverIntersection(Intersection):
             group['waiting'] = sum([process['waiting'] for process in group['processes'].values()])
             group['time_taken'] = datetime.timedelta()
             group['histogram'] = {str(minute): {'error_count': 0, 'success_count': 0, 'timeout_count': 0, 'processed_count': 0}.copy() for minute in range(0, 60)}.copy()
-            for process in group['processes'].values():
+            for process_id, process in group['processes'].items():
+
+                # Remove stale processes (those no longer in the connection thread)
+                if process_id not in self.process_id_to_name:
+                    del group['processes'][process_id]
+                    continue
+
+                # Calculate statistics on the active processes
                 group['time_taken'] += parse_duration(process['time_taken']) or datetime.timedelta(seconds=0)
                 for minute, histogram_dict in process.get('histogram').items():
                     group['histogram'][minute]['error_count'] += histogram_dict['error_count']
@@ -111,6 +119,6 @@ class WebserverIntersection(Intersection):
                     group['histogram'][minute]['processed_count'] += histogram_dict['processed_count']
             group['frequency'] = sum([sum(process['frequency'].values()) for process in group['processes'].values()]) or 1  # Fallback to at least one, otherwise division fails below
 
-            group['avg_time_taken'] = group['time_taken'] / group['frequency'] / len(group['processes'])
+            group['avg_time_taken'] = group['time_taken'] / group['frequency'] / len(group['processes']) if len(group['processes']) else 0
 
         yield
