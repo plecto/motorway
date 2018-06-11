@@ -1,5 +1,4 @@
 from unittest import TestCase
-from boto.dynamodb2.exceptions import ItemNotFound
 from motorway.contrib.amazon_kinesis.ramps import KinesisRamp
 from mock import patch
 
@@ -27,13 +26,13 @@ class MockControlTable(object):
         for item in self.control_table_item_list:
             yield item
 
-    def put_item(self, Item):
+    def put_item(self, Item, ConditionExpression):
         self.control_table_item_list.append(Item)
 
 
 class AmazonKinesisTestCase(TestCase):
     def get_kinesis_ramp(self, control_table_item_list=None, shards=None):
-        with patch('boto.kinesis.connect_to_region', return_value=None) as mock_method:
+        with patch('boto3.client', return_value=None) as mock_method:
             KinesisRamp.stream_name = "_unittest"
             KinesisRamp.heartbeat_timeout = 0  # Let's not care about waiting in this test
             kinesis_ramp = KinesisRamp(shard_threads_enabled=False)
