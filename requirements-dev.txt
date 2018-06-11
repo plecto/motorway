@@ -1,7 +1,7 @@
 -r requirements.txt
 sphinx
 sphinx-autobuild
-boto
+boto3
 simple-salesforce
 recurly
 sqlalchemy
