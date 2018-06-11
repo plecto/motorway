@@ -1,6 +1,6 @@
 from motorway.intersection import Intersection
 import boto3
-from utils import encode_to_json
+from utils import sqs_encode_to_json
 
 
 class SQSInsertIntersection(Intersection):
@@ -22,6 +22,6 @@ class SQSInsertIntersection(Intersection):
         }
 
     def process(self, message):
-        self.queue.send_message(MessageBody=encode_to_json(message.content))
+        self.queue.send_message(MessageBody=sqs_encode_to_json(message.content))
         self.ack(message)
         yield
