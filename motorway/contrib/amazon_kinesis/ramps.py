@@ -4,23 +4,12 @@ import json
 from threading import Thread, Lock, Semaphore
 import time
 import uuid
-
 import datetime
-from boto.dynamodb2.exceptions import ItemNotFound, ConditionalCheckFailedException, \
-    ProvisionedThroughputExceededException, LimitExceededException
-from boto.dynamodb2.fields import HashKey
-from boto.dynamodb2.items import Item
-from boto.dynamodb2.table import Table
-from boto.dynamodb2.types import STRING
-from boto.exception import JSONResponseError
+import logging
+import boto3
 from motorway.messages import Message
 from motorway.ramp import Ramp
-import boto.kinesis
-import boto.ec2.cloudwatch
-import boto.kinesis.exceptions
-import logging
-
-
+from boto3.dynamodb.conditions import Attr
 shard_election_logger = logging.getLogger("motorway.contrib.amazon_kinesis.shard_election")
 
 logger = logging.getLogger(__name__)
@@ -34,7 +23,7 @@ class KinesisRamp(Ramp):
 
     def __init__(self, shard_threads_enabled=True, **kwargs):
         super(KinesisRamp, self).__init__(**kwargs)
-        self.conn = boto.kinesis.connect_to_region(**self.connection_parameters())
+        self.conn = boto3.client(**self.connection_parameters('kinesis'))
         assert self.stream_name, "Please define attribute stream_name on your KinesisRamp"
 
         control_table_name = self.get_control_table_name()
@@ -42,35 +31,37 @@ class KinesisRamp(Ramp):
         self.worker_id = str(uuid.uuid4())
         self.semaphore = Semaphore()
         self.uncompleted_ids = {}
-
+        self.dynamodb_client = boto3.client(**self.connection_parameters('dynamodb'))  # we need to client to catch exceptions
         if shard_threads_enabled:
-            dynamodb_connection = boto.dynamodb2.connect_to_region(**self.connection_parameters())
+            self.dynamodb = boto3.resource(**self.connection_parameters('dynamodb'))
 
-            table_config = dict(
-                connection=dynamodb_connection,
-                schema=[
-                    HashKey('shard_id', data_type=STRING),
-                ],
-                throughput={
-                    'read': 10,
-                    'write': 10,
-                }
-            )
 
             try:
-                dynamodb_connection.describe_table(control_table_name)
-            except JSONResponseError:
-                Table.create(
-                    control_table_name,
-                    **table_config
+                self.dynamodb_client.describe_table(TableName=control_table_name)
+            except self.dynamodb_client.exceptions.ResourceNotFoundException:
+                self.dynamodb_client.create_table(
+                    TableName=control_table_name,
+                    KeySchema=[
+                        {
+                            'AttributeName': 'shard_id',
+                            'KeyType': 'HASH'
+                        },
+                    ],
+                    ProvisionedThroughput={
+                        'ReadCapacityUnits': 10,
+                        'WriteCapacityUnits': 10
+                    },
+                    AttributeDefinitions=[
+                        {
+                            'AttributeName': 'shard_id',
+                            'AttributeType': 'S'
+                        },
+                    ],
                 )
+                self.dynamodb_client.get_waiter('table_exists').wait(TableName=control_table_name)
 
-            self.control_table = Table(
-                control_table_name,
-                **table_config
-            )
-
-            shards = self.conn.describe_stream(self.stream_name)['StreamDescription']['Shards']
+            self.control_table = self.dynamodb.Table(control_table_name)
+            shards = self.conn.describe_stream(StreamName=self.stream_name)['StreamDescription']['Shards']
             random.shuffle(shards)  # Start the threads in random order, in case of bulk restart
             threads = []
             self.insertion_queue = Queue()
@@ -85,21 +76,24 @@ class KinesisRamp(Ramp):
 
     def claim_shard(self, shard_id):
         shard_election_logger.info("Claiming shard %s" % shard_id)
-        control_record = self.control_table.get_item(shard_id=shard_id)
+        control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
         control_record['worker_id'] = self.worker_id
         control_record['heartbeat'] = 0
         try:
-            control_record.save()
-        except ConditionalCheckFailedException:  # Someone else edited the record
+            self.control_table.put_item(Item=control_record,
+                                        ConditionExpression=Attr('shard_id').eq(shard_id) & Attr('checkpoint').eq(control_record['checkpoint'])
+                                        # ensure that the record was not changed between the get and put.
+                                        )
+        except self.dynamodb_client.exceptions.ConditionalCheckFailedException:  # Someone else edited the record
             shard_election_logger.debug("Failed to claim %s to %s" % (shard_id, self.worker_id))
             return False
         return True
 
     def can_claim_shard(self, shard_id):
-        control_record = self.control_table.get_item(shard_id=shard_id)
+        control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
         heartbeat = control_record['heartbeat']
         time.sleep(self.heartbeat_timeout)
-        if heartbeat == self.control_table.get_item(shard_id=shard_id)['heartbeat']:  # TODO: check worker_id as well
+        if heartbeat == self.control_table.get_item(Key={'shard_id': shard_id})['Item']['heartbeat']:  # TODO: check worker_id as well
             shard_election_logger.debug("Shard %s - heartbeat remained unchanged for defined time, taking over" % shard_id)
             return True
         else:
@@ -153,41 +147,41 @@ class KinesisRamp(Ramp):
                                 if self.claim_shard(shard_id):
                                     break
                         time.sleep(random.randrange(2, 15))
-                except ItemNotFound:
+                except KeyError:
                     # no record for this shard found, nobody ever claimed the shard yet, so claim it
-                    control_record = Item(self.control_table, data={
+                    self.control_table.put_item(Item={
                         'shard_id': shard_id,
                         'checkpoint': 0,
                         'worker_id': self.worker_id,
                         'heartbeat': 0,
                     })
-                    control_record.save()
 
                 # get initial iterator
-                control_record = self.control_table.get_item(shard_id=shard_id)
+                control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
                 if control_record['checkpoint'] > 0:
                     # if we have a checkpoint, start from the checkpoint
                     iterator = self.conn.get_shard_iterator(
-                        self.stream_name,
-                        shard_id,
-                        "AT_SEQUENCE_NUMBER",
-                        starting_sequence_number=str(control_record['checkpoint'])
+                        StreamName=self.stream_name,
+                        ShardId=shard_id,
+                        ShardIteratorType="AT_SEQUENCE_NUMBER",
+                        StartingSequenceNumber=str(control_record['checkpoint'])
                     )['ShardIterator']
                 else:
                     # we have no checkpoint stored, start from the latest item in Kinesis
                     iterator = self.conn.get_shard_iterator(
-                        self.stream_name,
-                        shard_id,
-                        "LATEST",
+                        StreamName=self.stream_name,
+                        ShardId=shard_id,
+                        ShardIteratorType="LATEST",
                     )['ShardIterator']
 
-                cloudwatch = boto.ec2.cloudwatch.connect_to_region(**self.connection_parameters())
+                cloudwatch = boto3.client(**self.connection_parameters('cloudwatch'))
                 current_minute = lambda: datetime.datetime.now().minute
                 minute = None
                 latest_item = None
                 while True:
-                    control_record = self.control_table.get_item(shard_id=shard_id)  # always retrieve this at the top of the loop
-
+                    control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']  # always retrieve this at the top of the loop
+                    current_checkpoint = control_record['checkpoint']
+                    current_heartbeat = control_record['heartbeat']
                     # if the shard was claimed by another worker, break out of the loop
                     if not control_record['worker_id'] == self.worker_id:
                         shard_election_logger.info("Lost shard %s, going back to standby" % shard_id)
@@ -201,11 +195,15 @@ class KinesisRamp(Ramp):
                     elif latest_item:
                         # or the latest item we yielded
                         control_record['checkpoint'] = latest_item
-                    control_record.save()  # Will fail if someone else modified it - ConditionalCheckFailedException
+
+                    self.control_table.put_item(Item=control_record,
+                                                ConditionExpression=Attr('shard_id').eq(shard_id) & Attr('checkpoint').eq(current_checkpoint) & Attr('worker_id').eq(self.worker_id) & Attr('heartbeat').eq(current_heartbeat)
+                                                # Will fail if someone else modified it - ConditionalCheckFailedException
+                                                )
 
                     if len(self.uncompleted_ids[shard_id]) < self.MAX_UNCOMPLETED_ITEMS:
                         # get records from Kinesis, using the previously created iterator
-                        result = self.conn.get_records(iterator, limit=self.GET_RECORDS_LIMIT)
+                        result = self.conn.get_records(ShardIterator=iterator, Limit=self.GET_RECORDS_LIMIT)
 
                         # insert the records into the queue, and use the provided iterator for the next loop
                         for record in result['Records']:
@@ -220,42 +218,46 @@ class KinesisRamp(Ramp):
                         # use the latest record we added to the queue as the starting point
                         next_iterator_number = latest_item if latest_item else str(control_record['checkpoint'])
                         iterator = self.conn.get_shard_iterator(
-                            self.stream_name,
-                            shard_id,
-                            "AT_SEQUENCE_NUMBER",
-                            starting_sequence_number=next_iterator_number
+                            StreamName=self.stream_name,
+                            ShardId=shard_id,
+                            ShardIteratorType="AT_SEQUENCE_NUMBER",
+                            StartingSequenceNumber=next_iterator_number
                         )['ShardIterator']
 
                         # get just one item to update the MillisBehindLatest below
-                        result = self.conn.get_records(iterator, limit=1)
+                        result = self.conn.get_records(ShardIterator=iterator, Limit=1)
 
                     # Push metrics to CloudWatch
                     delay = result['MillisBehindLatest']
                     if minute != current_minute():  # push once per minute to CloudWatch.
                         minute = current_minute()
-                        cloudwatch.put_metric_data(
-                            'Motorway/Kinesis',
-                            'MillisecondsBehind',
-                            value=delay,
-                            unit='Milliseconds',
-                            dimensions={
-                                'Stream': self.stream_name,
-                                'Shard': shard_id
-                            }
-                        )
+                        cloudwatch.put_metric_data(Namespace='Motorway/Kinesis',
+                                                   MetricData=[{'MetricName': 'MillisecondsBehind',
+                                                                'Dimensions': [{
+                                                                    'Name': 'Stream',
+                                                                    'Value': self.stream_name
+                                                                }, {
+                                                                    'Name': 'Shard',
+                                                                    'Value': shard_id
+                                                                }],
+                                                                'Value': delay,
+                                                                'Unit': 'Milliseconds'
+                                                                }])
 
                     # recommended pause between fetches from AWS
                     time.sleep(1)
-            except ConditionalCheckFailedException as e:
+            except self.dynamodb_client.exceptions.ConditionalCheckFailedException as e:
                 logger.warning(e)
                 pass  # we're no longer worker for this shard
-            except (ProvisionedThroughputExceededException, LimitExceededException, boto.kinesis.exceptions.ProvisionedThroughputExceededException, boto.kinesis.exceptions.LimitExceededException) as e:
+            except (self.dynamodb_client.exceptions.ProvisionedThroughputExceededException, self.dynamodb_client.exceptions.ProvisionedThroughputExceededException,
+                    self.conn.exceptions.LimitExceededException, self.conn.exceptions.ProvisionedThroughputExceededException):
                 logger.warning(e)
                 time.sleep(random.randrange(5, self.heartbeat_timeout/2))  # back off for a while
 
-    def connection_parameters(self):
+    def connection_parameters(self, service_name):
         return {
             'region_name': 'eu-west-1',
+            'service_name': service_name,
             # Add this or use ENV VARS
             # 'aws_access_key_id': '',
             # 'aws_secret_access_key': ''

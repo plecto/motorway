@@ -17,18 +17,18 @@ class MockControlTable(object):
     def __init__(self, control_table_item_list):
         self.control_table_item_list = control_table_item_list
 
-    def get_item(self, shard_id=None):
+    def get_item(self, Key=None):
         for item in self.control_table_item_list:
-            if item['shard_id'] == shard_id:
-                return item
-        raise ItemNotFound()
+            if item['shard_id'] == Key['shard_id']:
+                return {'Item': item}  # a kinesis respons contains a dictionary with lots of metadata and and Item element if any items where found
+        raise KeyError('Item')
 
     def scan(self):
         for item in self.control_table_item_list:
             yield item
 
-    def _put_item(self, item_data, expects=None):
-        pass
+    def put_item(self, Item):
+        self.control_table_item_list.append(Item)
 
 
 class AmazonKinesisTestCase(TestCase):
@@ -63,7 +63,7 @@ class AmazonKinesisTestCase(TestCase):
     def test_cannot_claim_timeout(self):
         kinesis_ramp = self.get_kinesis_ramp(shards=['shard-1',])
         def change_heartbeat(seconds):
-            kinesis_ramp.control_table.get_item(shard_id='shard-1')['heartbeat'] += 1
+            kinesis_ramp.control_table.get_item(Key={'shard_id':'shard-1'})['Item']['heartbeat'] += 1
         with patch('time.sleep', change_heartbeat) as mock_method:
             self.assertFalse(
                 kinesis_ramp.can_claim_shard("shard-1")
@@ -87,8 +87,8 @@ class AmazonKinesisTestCase(TestCase):
         kinesis_ramp = self.get_kinesis_ramp(shards=['shard-1', 'shard-2'], control_table_item_list=control_table_item_list)
 
         def change_heartbeat(seconds):
-            kinesis_ramp.control_table.get_item(shard_id='shard-1')['heartbeat'] += 1
-            kinesis_ramp.control_table.get_item(shard_id='shard-1')['checkpoint'] = 1337
+            kinesis_ramp.control_table.get_item(Key={'shard_id': 'shard-1'})['Item']['heartbeat'] += 1
+            kinesis_ramp.control_table.get_item(Key={'shard_id': 'shard-1'})['Item']['checkpoint'] = 1337
         with patch('time.sleep', change_heartbeat) as mock_method:
             self.assertTrue(
                 kinesis_ramp.can_claim_shard("shard-1")
@@ -120,8 +120,8 @@ class AmazonKinesisTestCase(TestCase):
         kinesis_ramp_a.claim_shard("shard-1")
         kinesis_ramp_a.claim_shard("shard-2")
 
-        self.assertEqual(kinesis_ramp_b.control_table.get_item('shard-1')['heartbeat'], 0)
+        self.assertEqual(kinesis_ramp_b.control_table.get_item(Key={'shard_id': 'shard-1'})['Item']['heartbeat'], 0)
         control_table_item_list[0]['checkpoint'] = 1337  # Simulate changing to DynamoDB entry
         kinesis_ramp_b.claim_shard('shard-1')
-        self.assertEqual(kinesis_ramp_b.control_table.get_item('shard-1')['worker_id'], kinesis_ramp_b.worker_id)
-        self.assertEqual(kinesis_ramp_b.control_table.get_item('shard-1')['checkpoint'], 1337)
+        self.assertEqual(kinesis_ramp_b.control_table.get_item(Key={'shard_id': 'shard-1'})['Item']['worker_id'], kinesis_ramp_b.worker_id)
+        self.assertEqual(kinesis_ramp_b.control_table.get_item(Key={'shard_id': 'shard-1'})['Item']['checkpoint'], 1337)

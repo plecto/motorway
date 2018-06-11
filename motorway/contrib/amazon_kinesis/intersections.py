@@ -1,5 +1,5 @@
 import json
-import boto.kinesis
+import boto3
 from motorway.decorators import batch_process
 from motorway.intersection import Intersection
 from time import sleep
@@ -12,15 +12,14 @@ class KinesisInsertIntersection(Intersection):
 
     def __init__(self, **kwargs):
         super(KinesisInsertIntersection, self).__init__(**kwargs)
-        self.conn = boto.kinesis.connect_to_region(**self.connection_parameters())
+        self.conn = boto3.client(**self.connection_parameters())
         assert self.stream_name, "Please define attribute stream_name on your KinesisInsertIntersection"
 
     def connection_parameters(self):
         return {
             'region_name': 'eu-west-1',
+            'service_name': 'kinesis',
             # Add this or use ENV VARS
-            # 'aws_access_key_id': '',
-            # 'aws_secret_access_key': ''
         }
 
     @batch_process(limit=500, wait=1)
@@ -45,7 +44,7 @@ class KinesisInsertIntersection(Intersection):
 
         while len(records) > 0:
             logger.debug('put %s records' % len(records))
-            response = self.conn.put_records(records, self.stream_name)
+            response = self.conn.put_records(Records=records, StreamName=self.stream_name)
             records = []
             for i, record in enumerate(response['Records']):
                 if len(record.get('ErrorCode', '')) > 0:
