@@ -15,6 +15,10 @@ shard_election_logger = logging.getLogger("motorway.contrib.amazon_kinesis.shard
 logger = logging.getLogger(__name__)
 
 
+class NoItemsReturned(Exception):
+    pass
+
+
 class KinesisRamp(Ramp):
     stream_name = None
     heartbeat_timeout = 30  # Wait 10 seconds for a heartbeat update, or kill it
@@ -31,7 +35,7 @@ class KinesisRamp(Ramp):
         self.worker_id = str(uuid.uuid4())
         self.semaphore = Semaphore()
         self.uncompleted_ids = {}
-        self.dynamodb_client = boto3.client(**self.connection_parameters('dynamodb'))  # we need to client to catch exceptions
+        self.dynamodb_client = boto3.client(**self.connection_parameters('dynamodb'))
         if shard_threads_enabled:
             self.dynamodb = boto3.resource(**self.connection_parameters('dynamodb'))
 
@@ -76,7 +80,10 @@ class KinesisRamp(Ramp):
 
     def claim_shard(self, shard_id):
         shard_election_logger.info("Claiming shard %s" % shard_id)
-        control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
+        try:
+            control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
+        except KeyError:
+            raise NoItemsReturned()
         control_record['worker_id'] = self.worker_id
         control_record['heartbeat'] = 0
         try:
@@ -90,7 +97,10 @@ class KinesisRamp(Ramp):
         return True
 
     def can_claim_shard(self, shard_id):
-        control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
+        try:
+            control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
+        except KeyError:
+            raise NoItemsReturned()
         heartbeat = control_record['heartbeat']
         time.sleep(self.heartbeat_timeout)
         if heartbeat == self.control_table.get_item(Key={'shard_id': shard_id})['Item']['heartbeat']:  # TODO: check worker_id as well
@@ -147,7 +157,7 @@ class KinesisRamp(Ramp):
                                 if self.claim_shard(shard_id):
                                     break
                         time.sleep(random.randrange(2, 15))
-                except KeyError:
+                except NoItemsReturned:
                     # no record for this shard found, nobody ever claimed the shard yet, so claim it
                     self.control_table.put_item(Item={
                         'shard_id': shard_id,

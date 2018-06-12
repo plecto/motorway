@@ -1,5 +1,5 @@
 from unittest import TestCase
-from motorway.contrib.amazon_kinesis.ramps import KinesisRamp
+from motorway.contrib.amazon_kinesis.ramps import KinesisRamp, NoItemsReturned
 from mock import patch
 
 
@@ -20,7 +20,7 @@ class MockControlTable(object):
         for item in self.control_table_item_list:
             if item['shard_id'] == Key['shard_id']:
                 return {'Item': item}  # a kinesis respons contains a dictionary with lots of metadata and and Item element if any items where found
-        raise KeyError('Item')
+        raise NoItemsReturned()
 
     def scan(self):
         for item in self.control_table_item_list:
