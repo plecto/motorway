@@ -28,11 +28,11 @@ class SQSRamp(Ramp):
         for msg in self.queue.receive_messages(MaxNumberOfMessages=10, WaitTimeSeconds=5, VisibilityTimeout=10*60):
             # Gets max 10 messages, waiting for max 5 seconds to receive them and blocks other from receiving it for 10m
             self.messages[msg.message_id] = msg.receipt_handle  # we need the receipt_handle to delete the message and we always want to store the latest one, according to the sqs docs
+            body = json.loads(msg.body)
             if self.json_group_key:
-                body = json.loads(msg.body)
                 yield Message(msg.message_id, body, grouping_value=body[self.json_group_key])
             else:
-                yield Message(msg.message_id, msg.body)
+                yield Message(msg.message_id, body)
 
     def success(self, _id):
         if _id in self.messages:
