@@ -23,8 +23,7 @@ class MockControlTable(object):
         raise NoItemsReturned()
 
     def scan(self):
-        for item in self.control_table_item_list:
-            yield item
+        return {'Items': self.control_table_item_list}
 
     def put_item(self, Item, ConditionExpression):
         self.control_table_item_list.append(Item)
