@@ -116,7 +116,7 @@ class KinesisRamp(Ramp):
             self.worker_id: 0
         }
 
-        shards = list(self.control_table.scan())
+        shards = self.control_table.scan()['Items']
         for shard in shards:  # Update active worker cache
             if shard['worker_id'] not in active_workers:
                 heartbeats[shard['worker_id']] = shard['heartbeat']
