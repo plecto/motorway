@@ -31,7 +31,7 @@ class KinesisInsertIntersection(Intersection):
         Each shard can support writes up to 1,000 records per second, up to a maximum data write total of 1 MB per second.
         This means we can run 2 intersections (2 x 500 records) submitting to the same shard before hitting the write limit (1000 records/sec)
         If we hit the write limit we wait 2 seconds and try to send the records that failed again, rinse and repeat
-        If any other error than ProvisionedThroughputExceededException (only InternalFailure is currently supported) is returned in the response
+        If any other error than ProvisionedThroughputExceededException or InternalFailure is returned in the response
         we log it using loglevel error and dump the message for replayability instead of raising an exception that would drop the whole batch.
         So if you are going to use this intersection in production be sure to monitor and handle the messages with log level error!
         :param messages: 
@@ -48,8 +48,8 @@ class KinesisInsertIntersection(Intersection):
             records = []
             for i, record in enumerate(response['Records']):
                 if len(record.get('ErrorCode', '')) > 0:
-                    if record['ErrorCode'] == 'ProvisionedThroughputExceededException':
-                        # retry when throttled
+                    if record['ErrorCode'] in ['ProvisionedThroughputExceededException', 'InternalFailure']:
+                        # retry when throttled or an internal failure
                         logger.warning(record['ErrorCode'])
                         kinesis_record = {'PartitionKey': messages[i].grouping_value, 'Data': json.dumps(messages[i].content)}
                         records.append(kinesis_record)
