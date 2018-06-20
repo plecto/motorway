@@ -48,8 +48,8 @@ class KinesisInsertIntersection(Intersection):
             records = []
             for i, record in enumerate(response['Records']):
                 if len(record.get('ErrorCode', '')) > 0:
-                    if record['ErrorCode'] == 'ProvisionedThroughputExceededException':
-                        # retry when throttled
+                    if record['ErrorCode'] in ['ProvisionedThroughputExceededException', 'InternalFailure']:
+                        # retry when throttled or an internal failure
                         logger.warning(record['ErrorCode'])
                         kinesis_record = {'PartitionKey': messages[i].grouping_value, 'Data': json.dumps(messages[i].content)}
                         records.append(kinesis_record)
