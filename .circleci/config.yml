@@ -26,7 +26,7 @@ jobs:
 
       - run:
         name: execute nose test
-        command:|
+        command: |
           source venv/bin/activate
           nosetest
 
