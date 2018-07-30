@@ -1,0 +1,40 @@
+version: 2
+jobs:
+  test:
+    docker:
+      - image: circleci/python:2.7-jessie
+
+    steps:
+      - checkout
+      # Download and cache python dependencies
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+
+      - run:
+          name: install dependencies
+          command: |
+            virtualenv venv
+            source venv/bin/activate
+            pip install -r requirements-dev.txt
+            python setup.py install
+
+      - save_cache:
+          paths:
+            - ./venv
+          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+
+      - run:
+          name: execute nose test
+          command: |
+            source venv/bin/activate
+            nosetests
+
+workflows:
+  version: 2
+  run_test:
+    jobs:
+      - test
+
+
+
