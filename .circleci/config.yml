@@ -28,7 +28,7 @@ jobs:
           name: execute nose test
           command: |
             source venv/bin/activate
-            nosetest
+            nosetests
 
 workflows:
   version: 2
