@@ -29,5 +29,8 @@ workflows:
   version: 2
   run_test:
     jobs:
-      - test
+      - test:
+        filters:
+          branches:
+            only: /.*/
     context: org-global
