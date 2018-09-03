@@ -97,13 +97,25 @@ class KinesisRamp(Ramp):
         return True
 
     def can_claim_shard(self, shard_id):
-        try:
-            control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
-        except KeyError:
-            raise NoItemsReturned()
+        shards = self.control_table.scan()['Items']
+        control_record = None
+        shards_by_shard_id = {}
+        for shard in shards:
+            if shard['shard_id'] == shard_id:
+                control_record = shard
+            # make a copy
+            shards_by_shard_id[shard['shard_id']] = dict(shard)
+
+        if control_record is None:
+            return NoItemsReturned()
+
         heartbeat = control_record['heartbeat']
+        worker_id = control_record['worker_id']
         time.sleep(self.heartbeat_timeout)
-        if heartbeat == self.control_table.get_item(Key={'shard_id': shard_id})['Item']['heartbeat']:  # TODO: check worker_id as well
+        updated_control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
+
+        if heartbeat == updated_control_record['heartbeat'] and updated_control_record['worker_id'] == worker_id:
+            # if both the heartbeat and the worker_id is the same
             shard_election_logger.debug("Shard %s - heartbeat remained unchanged for defined time, taking over" % shard_id)
             return True
         else:
@@ -120,7 +132,7 @@ class KinesisRamp(Ramp):
         for shard in shards:  # Update active worker cache
             if shard['worker_id'] not in active_workers:
                 heartbeats[shard['worker_id']] = shard['heartbeat']
-            if heartbeats[shard['worker_id']] == shard['heartbeat']:
+            if shard['heartbeat'] == shards_by_shard_id[shard['shard_id']]['heartbeat']:
                 active_workers[shard['worker_id']] = False
             else:
                 active_workers[shard['worker_id']] = True
