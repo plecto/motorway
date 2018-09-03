@@ -26,7 +26,9 @@ class MockControlTable(object):
         return {'Items': self.control_table_item_list}
 
     def put_item(self, Item, ConditionExpression):
-        self.control_table_item_list.append(Item)
+        for i, item in enumerate(self.control_table_item_list):
+            if item['shard_id'] == Item['shard_id']:
+                self.control_table_item_list[i] = Item
 
 
 class AmazonKinesisTestCase(TestCase):
@@ -46,7 +48,9 @@ class AmazonKinesisTestCase(TestCase):
                 ) for i, shard_id in enumerate(shards)]
             for shard in shards:
                 kinesis_ramp.uncompleted_ids[shard] = []
-            kinesis_ramp.control_table = MockControlTable(control_table_item_list)
+
+            if control_table_item_list:
+                kinesis_ramp.control_table = MockControlTable(control_table_item_list)
             return kinesis_ramp
 
     def test_can_claim_timeout(self):
@@ -60,6 +64,7 @@ class AmazonKinesisTestCase(TestCase):
 
     def test_cannot_claim_timeout(self):
         kinesis_ramp = self.get_kinesis_ramp(shards=['shard-1',])
+
         def change_heartbeat(seconds):
             kinesis_ramp.control_table.get_item(Key={'shard_id':'shard-1'})['Item']['heartbeat'] += 1
         with patch('time.sleep', change_heartbeat) as mock_method:
@@ -123,3 +128,55 @@ class AmazonKinesisTestCase(TestCase):
         kinesis_ramp_b.claim_shard('shard-1')
         self.assertEqual(kinesis_ramp_b.control_table.get_item(Key={'shard_id': 'shard-1'})['Item']['worker_id'], kinesis_ramp_b.worker_id)
         self.assertEqual(kinesis_ramp_b.control_table.get_item(Key={'shard_id': 'shard-1'})['Item']['checkpoint'], 1337)
+
+    def test_re_balance(self):
+        """
+        test for re-balancing when we have 3 ramps and 10 shards
+        :return:
+        """
+        shards = []
+        control_table_item_list = []
+        kinesis_ramp1 = self.get_kinesis_ramp()
+        kinesis_ramp2 = self.get_kinesis_ramp()
+        kinesis_ramp3 = self.get_kinesis_ramp()
+        worker_id = kinesis_ramp1.worker_id
+        for i in xrange(1, 11):
+            shard_id = "shard-%s" % str(i)
+            shards.append(shard_id)
+            if i == 11:
+                # leave one shard to be claimed
+                continue
+            if i == 4:
+                worker_id = kinesis_ramp2.worker_id
+            elif i == 7:
+                worker_id = kinesis_ramp3.worker_id
+            # assign each worker 3 shards
+            control_table_item_list.append(MockDynamoItem(
+                shard_id=shard_id,
+                checkpoint=0,
+                worker_id=worker_id,
+                heartbeat=0,
+            ))
+        table = MockControlTable(control_table_item_list) # create a shared control table
+
+        kinesis_ramp1.control_table = table
+        kinesis_ramp2.control_table = table
+        kinesis_ramp3.control_table = table
+
+        def change_heartbeat(seconds):
+            for j in xrange(1, 10):
+                # change the first nines heartbeat to exclude them from rebalancing
+                table.get_item(Key={'shard_id': 'shard-%s' % j})['Item']['heartbeat'] += 1
+
+        with patch('time.sleep', change_heartbeat) as mock_method:
+            self.assertTrue(kinesis_ramp1.can_claim_shard("shard-10"))
+            self.assertTrue(kinesis_ramp1.claim_shard("shard-10"))
+
+        def change_heartbeat10(seconds):
+            for j in xrange(1, 11):
+                # change the heartbeat for all shards so no workers seems idle
+                table.get_item(Key={'shard_id': 'shard-%s' % j})['Item']['heartbeat'] += 1
+
+        with patch('time.sleep', change_heartbeat10) as mock_method:
+            # we should not be able to claim shard 10 since we have a optimal distribution of 3,3,4 and no workers are marked as idle
+            self.assertFalse(kinesis_ramp2.can_claim_shard("shard-10"))
