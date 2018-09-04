@@ -36,9 +36,9 @@ class KinesisRamp(Ramp):
         self.semaphore = Semaphore()
         self.uncompleted_ids = {}
         self.dynamodb_client = boto3.client(**self.connection_parameters('dynamodb'))
+
         if shard_threads_enabled:
             self.dynamodb = boto3.resource(**self.connection_parameters('dynamodb'))
-
 
             try:
                 self.dynamodb_client.describe_table(TableName=control_table_name)
@@ -107,7 +107,7 @@ class KinesisRamp(Ramp):
             shards_by_shard_id[shard['shard_id']] = dict(shard)
 
         if control_record is None:
-            return NoItemsReturned()
+            raise NoItemsReturned()
 
         heartbeat = control_record['heartbeat']
         worker_id = control_record['worker_id']
