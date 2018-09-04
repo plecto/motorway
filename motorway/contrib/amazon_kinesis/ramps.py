@@ -97,17 +97,18 @@ class KinesisRamp(Ramp):
         return True
 
     def can_claim_shard(self, shard_id):
-        shards = self.control_table.scan()['Items']
+        heartbeats = {}
         control_record = None
-        shards_by_shard_id = {}
+        shards = self.control_table.scan()['Items']
         for shard in shards:
             if shard['shard_id'] == shard_id:
                 control_record = shard
-            # make a copy
-            shards_by_shard_id[shard['shard_id']] = dict(shard)
+            heartbeats[shard['worker_id']] = shard['heartbeat']
 
         if control_record is None:
             raise NoItemsReturned()
+
+        heartbeats[self.worker_id] = 0
 
         heartbeat = control_record['heartbeat']
         worker_id = control_record['worker_id']
@@ -116,26 +117,25 @@ class KinesisRamp(Ramp):
 
         if heartbeat == updated_control_record['heartbeat'] and updated_control_record['worker_id'] == worker_id:
             # if both the heartbeat and the worker_id is the same
-            shard_election_logger.debug("Shard %s - heartbeat remained unchanged for defined time, taking over" % shard_id)
+            shard_election_logger.debug("Shard %s - heartbeat and worker id remained unchanged for defined time, taking over" % shard_id)
             return True
+        elif updated_control_record['worker_id'] != worker_id:
+            shard_election_logger.debug("Shard %s - Worker id changed to %s, continue sleeping" % (shard_id, updated_control_record['worker_id']))
         else:
             shard_election_logger.debug("Shard %s - Heartbeat changed, continue sleeping" % shard_id)
         # Balance, if possible
         active_workers = {
             self.worker_id: True
         }
-        heartbeats = {
-            self.worker_id: 0
-        }
 
+        # re-fetch the shards and compare the heartbeat
         shards = self.control_table.scan()['Items']
         for shard in shards:  # Update active worker cache
-            if shard['worker_id'] not in active_workers:
-                heartbeats[shard['worker_id']] = shard['heartbeat']
-            if shard['heartbeat'] == shards_by_shard_id[shard['shard_id']]['heartbeat']:
+            if heartbeats[shard['worker_id']] == shard['heartbeat']:
                 active_workers[shard['worker_id']] = False
             else:
                 active_workers[shard['worker_id']] = True
+
         number_of_active_workers = sum([1 for is_active in active_workers.values() if is_active])
         number_of_shards = len(shards)
         optimal_number_of_shards_per_worker = number_of_shards / number_of_active_workers
