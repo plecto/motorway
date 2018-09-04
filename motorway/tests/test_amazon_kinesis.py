@@ -180,3 +180,9 @@ class AmazonKinesisTestCase(TestCase):
         with patch('time.sleep', change_heartbeat10) as mock_method:
             # we should not be able to claim shard 10 since we have a optimal distribution of 3,3,4 and no workers are marked as idle
             self.assertFalse(kinesis_ramp2.can_claim_shard("shard-10"))
+
+    def test_no_control_record(self):
+        kinesis_ramp = self.get_kinesis_ramp()
+        kinesis_ramp.control_table = MockControlTable([])
+        kinesis_ramp.uncompleted_ids['shard-1'] = []
+        self.assertRaises(NoItemsReturned, kinesis_ramp.can_claim_shard, 'shard_1')
