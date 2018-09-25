@@ -109,17 +109,14 @@ class KinesisRamp(Ramp):
             raise NoItemsReturned()
 
         heartbeats[self.worker_id] = 0
-
-        heartbeat = control_record['heartbeat']
-        worker_id = control_record['worker_id']
         time.sleep(self.heartbeat_timeout)
         updated_control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
 
-        if heartbeat == updated_control_record['heartbeat'] and updated_control_record['worker_id'] == worker_id:
+        if control_record['heartbeat'] == updated_control_record['heartbeat'] and control_record['worker_id'] == updated_control_record['worker_id']:
             # if both the heartbeat and the worker_id is the same
             shard_election_logger.debug("Shard %s - heartbeat and worker id remained unchanged for defined time, taking over" % shard_id)
             return True
-        elif updated_control_record['worker_id'] != worker_id:
+        elif updated_control_record['worker_id'] != control_record['worker_id']:
             shard_election_logger.debug("Shard %s - Worker id changed to %s, continue sleeping" % (shard_id, updated_control_record['worker_id']))
         else:
             shard_election_logger.debug("Shard %s - Heartbeat changed, continue sleeping" % shard_id)
