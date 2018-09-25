@@ -97,7 +97,8 @@ class KinesisRamp(Ramp):
         return True
 
     def can_claim_shard(self, shard_id):
-        heartbeats = {}
+        heartbeats = {}  # Store all heartbeats so we can compare them easily to track changes
+        
         control_record = None
         shards = self.control_table.scan()['Items']
         for shard in shards:
@@ -111,7 +112,8 @@ class KinesisRamp(Ramp):
         heartbeats[self.worker_id] = 0
         time.sleep(self.heartbeat_timeout)
         updated_control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
-
+        
+        # Continue sleeping if heartbeat or worker id has changed
         if control_record['heartbeat'] == updated_control_record['heartbeat'] and control_record['worker_id'] == updated_control_record['worker_id']:
             # if both the heartbeat and the worker_id is the same
             shard_election_logger.debug("Shard %s - heartbeat and worker id remained unchanged for defined time, taking over" % shard_id)
@@ -120,6 +122,7 @@ class KinesisRamp(Ramp):
             shard_election_logger.debug("Shard %s - Worker id changed to %s, continue sleeping" % (shard_id, updated_control_record['worker_id']))
         else:
             shard_election_logger.debug("Shard %s - Heartbeat changed, continue sleeping" % shard_id)
+        
         # Balance, if possible
         active_workers = {
             self.worker_id: True
