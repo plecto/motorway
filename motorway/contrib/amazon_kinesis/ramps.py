@@ -103,7 +103,7 @@ class KinesisRamp(Ramp):
         shards = self.control_table.scan()['Items']
         for shard in shards:
             if shard['shard_id'] == shard_id:
-                control_record = shard
+                control_record = dict(shard)
             heartbeats[shard['worker_id']] = shard['heartbeat']
 
         if control_record is None:
