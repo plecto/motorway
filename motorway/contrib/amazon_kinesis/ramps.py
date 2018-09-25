@@ -36,9 +36,9 @@ class KinesisRamp(Ramp):
         self.semaphore = Semaphore()
         self.uncompleted_ids = {}
         self.dynamodb_client = boto3.client(**self.connection_parameters('dynamodb'))
+
         if shard_threads_enabled:
             self.dynamodb = boto3.resource(**self.connection_parameters('dynamodb'))
-
 
             try:
                 self.dynamodb_client.describe_table(TableName=control_table_name)
@@ -97,33 +97,45 @@ class KinesisRamp(Ramp):
         return True
 
     def can_claim_shard(self, shard_id):
-        try:
-            control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
-        except KeyError:
+        heartbeats = {}  # Store all heartbeats so we can compare them easily to track changes
+        
+        control_record = None
+        shards = self.control_table.scan()['Items']
+        for shard in shards:
+            if shard['shard_id'] == shard_id:
+                control_record = dict(shard)
+            heartbeats[shard['worker_id']] = shard['heartbeat']
+
+        if control_record is None:
             raise NoItemsReturned()
-        heartbeat = control_record['heartbeat']
+
+        heartbeats[self.worker_id] = 0
         time.sleep(self.heartbeat_timeout)
-        if heartbeat == self.control_table.get_item(Key={'shard_id': shard_id})['Item']['heartbeat']:  # TODO: check worker_id as well
-            shard_election_logger.debug("Shard %s - heartbeat remained unchanged for defined time, taking over" % shard_id)
+        updated_control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
+        
+        # Continue sleeping if heartbeat or worker id has changed
+        if control_record['heartbeat'] == updated_control_record['heartbeat'] and control_record['worker_id'] == updated_control_record['worker_id']:
+            # if both the heartbeat and the worker_id is the same
+            shard_election_logger.debug("Shard %s - heartbeat and worker id remained unchanged for defined time, taking over" % shard_id)
             return True
+        elif updated_control_record['worker_id'] != control_record['worker_id']:
+            shard_election_logger.debug("Shard %s - Worker id changed to %s, continue sleeping" % (shard_id, updated_control_record['worker_id']))
         else:
             shard_election_logger.debug("Shard %s - Heartbeat changed, continue sleeping" % shard_id)
+        
         # Balance, if possible
         active_workers = {
             self.worker_id: True
         }
-        heartbeats = {
-            self.worker_id: 0
-        }
 
+        # re-fetch the shards and compare the heartbeat
         shards = self.control_table.scan()['Items']
         for shard in shards:  # Update active worker cache
-            if shard['worker_id'] not in active_workers:
-                heartbeats[shard['worker_id']] = shard['heartbeat']
             if heartbeats[shard['worker_id']] == shard['heartbeat']:
                 active_workers[shard['worker_id']] = False
             else:
                 active_workers[shard['worker_id']] = True
+
         number_of_active_workers = sum([1 for is_active in active_workers.values() if is_active])
         number_of_shards = len(shards)
         optimal_number_of_shards_per_worker = number_of_shards / number_of_active_workers
