@@ -272,7 +272,7 @@ class KinesisRamp(Ramp):
                 logger.warning(e)
                 pass  # we're no longer worker for this shard
             except (self.dynamodb_client.exceptions.ProvisionedThroughputExceededException, self.dynamodb_client.exceptions.ProvisionedThroughputExceededException,
-                    self.conn.exceptions.LimitExceededException, self.conn.exceptions.ProvisionedThroughputExceededException):
+                    self.conn.exceptions.LimitExceededException, self.conn.exceptions.ProvisionedThroughputExceededException) as e:
                 logger.warning(e)
                 time.sleep(random.randrange(5, self.heartbeat_timeout/2))  # back off for a while
 
