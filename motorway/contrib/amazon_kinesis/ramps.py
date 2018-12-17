@@ -97,6 +97,21 @@ class KinesisRamp(Ramp):
         return True
 
     def can_claim_shard(self, shard_id):
+        """
+        Determine whether or not a given shard can be claimed because of
+
+        1) It's currently not being processed by another process
+
+        2) It's unevenly balanced between the consuming nodes/workers
+
+        :param shard_id:
+        :return: bool
+        """
+
+        # =====================================
+        # | C L A I M  S T A L E  S H A R D S |
+        # =====================================
+
         heartbeats = {}  # Store all heartbeats so we can compare them easily to track changes
         
         control_record = None
@@ -122,7 +137,11 @@ class KinesisRamp(Ramp):
             shard_election_logger.debug("Shard %s - Worker id changed to %s, continue sleeping" % (shard_id, updated_control_record['worker_id']))
         else:
             shard_election_logger.debug("Shard %s - Heartbeat changed, continue sleeping" % shard_id)
-        
+
+        # =====================
+        # | B A L A N C I N G |
+        # =====================
+
         # Balance, if possible
         active_workers = {
             self.worker_id: True
