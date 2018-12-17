@@ -79,6 +79,12 @@ class KinesisRamp(Ramp):
         return 'pipeline-control-%s' % self.stream_name
 
     def claim_shard(self, shard_id):
+        """
+        Atomically update the shard in DynamoDB
+
+        :param shard_id:
+        :return: bool
+        """
         shard_election_logger.info("Claiming shard %s" % shard_id)
         try:
             control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
@@ -178,15 +184,28 @@ class KinesisRamp(Ramp):
         return False
 
     def process_shard(self, shard_id):
+        """
+        Every shard (at startup) has an active thread that runs this function to either consume or wait to be
+        ready to consume data from a shard
+
+        :param shard_id:
+        :return:
+        """
         while True:
             try:
                 # try to claim the shard
                 try:
+                    # Continuously try to claim until broken out of
                     while True:
-                        with self.semaphore:
-                            if self.can_claim_shard(shard_id):
-                                if self.claim_shard(shard_id):
-                                    break
+                        # First check if we can claim outside the semaphore in parallel on all shards
+                        if self.can_claim_shard(shard_id):
+                            # If we can claim it, try again with a semaphore ensuring we fully check the entire
+                            # table of workers/shards before we take the final decision
+                            with self.semaphore:
+                                if self.can_claim_shard(shard_id):
+                                    if self.claim_shard(shard_id):
+                                        break
+                        # Wait a bit until we check if it's available to claim again
                         time.sleep(random.randrange(2, 15))
                 except NoItemsReturned:
                     # no record for this shard found, nobody ever claimed the shard yet, so claim it
