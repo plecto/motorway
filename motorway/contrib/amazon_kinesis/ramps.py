@@ -118,19 +118,19 @@ class KinesisRamp(Ramp):
         # | C L A I M  S T A L E  S H A R D S |
         # =====================================
 
-        heartbeats = {}  # Store all heartbeats so we can compare them easily to track changes
+        worker_heartbeats = {}  # Store all heartbeats so we can compare them easily to track changes
         
         control_record = None
         shards = self.control_table.scan()['Items']
         for shard in shards:
             if shard['shard_id'] == shard_id:
                 control_record = dict(shard)
-            heartbeats[shard['worker_id']] = shard['heartbeat']
+            worker_heartbeats[shard['worker_id']] = shard['heartbeat']
 
         if control_record is None:
             raise NoItemsReturned()
 
-        heartbeats[self.worker_id] = 0
+        worker_heartbeats[self.worker_id] = 0
         time.sleep(self.heartbeat_timeout)
         updated_control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
         
@@ -156,7 +156,7 @@ class KinesisRamp(Ramp):
         # re-fetch the shards and compare the heartbeat
         shards = self.control_table.scan()['Items']
         for shard in shards:  # Update active worker cache
-            if heartbeats[shard['worker_id']] == shard['heartbeat']:
+            if shard['worker_id'] in worker_heartbeats and worker_heartbeats[shard['worker_id']] == shard['heartbeat']:
                 active_workers[shard['worker_id']] = False
             else:
                 active_workers[shard['worker_id']] = True
