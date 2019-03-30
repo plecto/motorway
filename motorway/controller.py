@@ -59,6 +59,7 @@ class ControllerIntersection(Intersection):
 
     @batch_process(wait=1, limit=500)
     def process(self, messages):
+        now = datetime.datetime.now()
         for message in messages:
             original_process = message.producer_uuid
             if original_process not in self.process_statistics:
@@ -78,7 +79,7 @@ class ControllerIntersection(Intersection):
                 self.messages[message.ramp_unique_id] = [
                     message.producer_uuid,
                     message.ack_value,
-                    datetime.datetime.now(),
+                    now,
                     destination_process
                 ]  # Set the new value to ack value
             elif message.ack_value >= 0:  # Message processed
@@ -87,7 +88,7 @@ class ControllerIntersection(Intersection):
                 if self.messages[message.ramp_unique_id][1] == Message.SUCCESS:
                     original_process = self.messages[message.ramp_unique_id][0]
                     self.process_statistics[original_process]['success'] += 1
-                    self.process_statistics[original_process]['histogram'][datetime.datetime.now().minute]['success_count'] += 1
+                    self.process_statistics[original_process]['histogram'][now.minute]['success_count'] += 1
                     self.success(message.ramp_unique_id, original_process)
                     del self.messages[message.ramp_unique_id]
                 else:  # Still not finished - update destination!
@@ -98,7 +99,7 @@ class ControllerIntersection(Intersection):
                     original_process, ack_value, start_time, destination_process = self.messages[message.ramp_unique_id]
                     del self.messages[message.ramp_unique_id]
                 self.process_statistics[original_process]['failed'] += 1
-                self.process_statistics[original_process]['histogram'][datetime.datetime.now().minute]['error_count'] += 1
+                self.process_statistics[original_process]['histogram'][now.minute]['error_count'] += 1
                 self.fail(
                     message.ramp_unique_id,
                     error_message=message.error_message,
@@ -113,7 +114,7 @@ class ControllerIntersection(Intersection):
                 rounded_seconds = round(time_taken.total_seconds(), 0)
                 self.process_statistics[current_process]['time_taken'] += time_taken
                 if ('msg_type' in message.content and message.content['msg_type'] != "new_msg") or ('sender' in message.content and message.content['sender'] == 'ramp'):
-                    self.process_statistics[current_process]['histogram'][datetime.datetime.now().minute]['processed_count'] += 1
+                    self.process_statistics[current_process]['histogram'][now.minute]['processed_count'] += 1
                     self.process_statistics[current_process]['frequency'][rounded_seconds] = self.process_statistics[current_process]['frequency'].get(rounded_seconds, 0) + 1
                     self.process_statistics[current_process]['total_frequency'] = sum(self.process_statistics[current_process]['frequency'].values())
                     self.process_statistics[current_process]['95_percentile'] = datetime.timedelta(seconds=percentile_from_dict(self.process_statistics[current_process]['frequency'], 95))
@@ -133,11 +134,11 @@ class ControllerIntersection(Intersection):
                 del self.messages[unique_id]  # This failed somewhere else in the chain and it was notificed already
             elif process_uuid_to_address and process not in process_uuid_to_address:  # check if dict is empty before checking if the process is in it (mainly for tests)
                 del self.messages[unique_id]  # clean up
-                self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['timeout_count'] += 1
+                self.process_statistics[process]['histogram'][now.minute]['timeout_count'] += 1
                 self.fail(unique_id, original_process, error_message="Assigned processed disappeared")
             elif (now - start_time) > datetime.timedelta(minutes=self.MESSAGE_TIMEOUT):
                 del self.messages[unique_id]  # clean up
-                self.process_statistics[process]['histogram'][datetime.datetime.now().minute]['timeout_count'] += 1
+                self.process_statistics[process]['histogram'][now.minute]['timeout_count'] += 1
                 self.fail(unique_id, original_process, error_message="Message timed out")
             elif ack_value > 0:
                 waiting_messages[process] = waiting_messages.get(process, 0) + 1
