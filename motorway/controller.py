@@ -128,20 +128,26 @@ class ControllerIntersection(Intersection):
 
         # Check message status
         waiting_messages = {}
+        messages_to_clean_up = []
         for unique_id, lst in self.messages.items():
             original_process, ack_value, start_time, process = lst
             if unique_id in self.failed_messages:
-                del self.messages[unique_id]  # This failed somewhere else in the chain and it was notificed already
+                # This failed somewhere else in the chain and it was notified already
+                messages_to_clean_up.append(unique_id)
             elif process_uuid_to_address and process not in process_uuid_to_address:  # check if dict is empty before checking if the process is in it (mainly for tests)
-                del self.messages[unique_id]  # clean up
+                messages_to_clean_up.append(unique_id)
                 self.process_statistics[process]['histogram'][now.minute]['timeout_count'] += 1
                 self.fail(unique_id, original_process, error_message="Assigned processed disappeared")
             elif (now - start_time) > datetime.timedelta(minutes=self.MESSAGE_TIMEOUT):
-                del self.messages[unique_id]  # clean up
+                messages_to_clean_up.append(unique_id)
                 self.process_statistics[process]['histogram'][now.minute]['timeout_count'] += 1
                 self.fail(unique_id, original_process, error_message="Message timed out")
             elif ack_value > 0:
                 waiting_messages[process] = waiting_messages.get(process, 0) + 1
+
+        # clean up
+        for unique_id in messages_to_clean_up:
+            del self.messages[unique_id]
 
         # Update histograms
         for process in self.process_statistics.keys():
