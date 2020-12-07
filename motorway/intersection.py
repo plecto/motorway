@@ -1,5 +1,5 @@
 import random
-from Queue import Empty
+from queue import Empty
 import logging
 import multiprocessing
 from threading import Thread
@@ -114,7 +114,7 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
                             self.send_message(generated_message, self.process_uuid, time_consumed=(datetime.datetime.now() - self.message_batch_start), control_message=self.send_control_messages)
                             self.message_batch_start = datetime.datetime.now()
                 except Exception as e:
-                    logger.error(unicode(e), exc_info=True)
+                    logger.error(str(e), exc_info=True)
 
                     # Don't send control messages if e.g. web server or other system process
                     if self.send_control_messages:
@@ -127,7 +127,7 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
             pass
 
     def ack(self, message, retries=100):
-        for index in xrange(0, retries):
+        for index in range(0, retries):
             try:
                 message.ack(time_consumed=(datetime.datetime.now() - self.message_batch_start))
                 break

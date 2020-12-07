@@ -1,5 +1,5 @@
 import random
-from Queue import Queue
+from queue import Queue
 import json
 from threading import Thread, Lock, Semaphore
 import time
