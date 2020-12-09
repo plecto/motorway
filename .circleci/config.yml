@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-      - image: circleci/python:2.7-jessie
+      - image: circleci/python:3.8.6-buster
 
     steps:
       - checkout
