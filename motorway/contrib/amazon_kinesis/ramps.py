@@ -163,7 +163,7 @@ class KinesisRamp(Ramp):
 
         number_of_active_workers = sum([1 for is_active in active_workers.values() if is_active])
         number_of_shards = len(shards)
-        optimal_number_of_shards_per_worker = number_of_shards / number_of_active_workers
+        optimal_number_of_shards_per_worker = number_of_shards // number_of_active_workers
         workers = set([shard['worker_id'] for shard in shards])
         shards_per_worker = {worker: sum([1 for shard in shards if shard['worker_id'] == worker]) for worker in workers}
         for shard in shards:
@@ -312,7 +312,7 @@ class KinesisRamp(Ramp):
             except (self.dynamodb_client.exceptions.ProvisionedThroughputExceededException, self.dynamodb_client.exceptions.ProvisionedThroughputExceededException,
                     self.conn.exceptions.LimitExceededException, self.conn.exceptions.ProvisionedThroughputExceededException) as e:
                 logger.warning(e)
-                time.sleep(random.randrange(5, self.heartbeat_timeout/2))  # back off for a while
+                time.sleep(random.randrange(5, self.heartbeat_timeout//2))  # back off for a while
 
     def connection_parameters(self, service_name):
         return {
