@@ -1,4 +1,4 @@
-import logging
+import logging.config
 from motorway.grouping import HashRingGrouper, SendToAllGrouper
 
 from motorway.pipeline import Pipeline

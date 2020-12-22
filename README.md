@@ -91,6 +91,12 @@ Current list of integrations:
 
 Look in motorway/contrib/ for these addons and feel free to contribute additional ones.
 
+Insights? No problem!
+============
+Motorway can be instrumented using New Relics python agent. Just run it using newrelic-admin and motorway 
+will start sending metrics. You can find them in New Relic as non-web transactions.
+
+
 License
 =======
    Copyright 2014 Plecto ApS

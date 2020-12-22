@@ -9,6 +9,7 @@ import uuid
 import datetime
 
 from motorway.exceptions import SocketBlockedException
+from motorway.instrumentation import instrumentation_manager
 from motorway.messages import Message
 from motorway.mixins import GrouperMixin, SendMessageMixin, ConnectionMixin
 from motorway.threads import ThreadRunner
@@ -109,7 +110,8 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
                     message = Message.from_message(value, controller_sock, process_name=self.process_uuid)
                 try:
                     self.message_batch_start = datetime.datetime.now()
-                    for generated_message in self.process(message):
+
+                    for generated_message in self.process_instrumented(message):
                         if generated_message is not None and self.send_socks:
                             self.send_message(generated_message, self.process_uuid, time_consumed=(datetime.datetime.now() - self.message_batch_start), control_message=self.send_control_messages)
                             self.message_batch_start = datetime.datetime.now()
@@ -125,6 +127,11 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
 
         except Empty:  # Didn't receive anything from ZMQ
             pass
+
+    def process_instrumented(self, message):
+        with instrumentation_manager("%s.process" % self.__class__.__name__):
+            for generated_message in self.process(message):
+                yield generated_message
 
     def ack(self, message, retries=100):
         for index in xrange(0, retries):
