@@ -1,9 +1,9 @@
 from contextlib import contextmanager
-
+import os
 NEW_RELIC = False
 try:
     import newrelic.agent
-    if newrelic.agent.application().active:
+    if os.environ.get("NEW_RELIC_CONFIG_FILE"):
         NEW_RELIC = True
 except ImportError:
     pass
