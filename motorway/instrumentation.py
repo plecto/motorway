@@ -12,17 +12,7 @@ except ImportError:
 @contextmanager
 def instrumentation_manager(task_name):
     if NEW_RELIC:
-        yield newrelic.agent.BackgroundTask(newrelic.agent.application(), task_name)
+        with newrelic.agent.BackgroundTask(newrelic.agent.application(), task_name):
+            yield
     else:
-        yield EmptyInstrumentationManager()
-
-
-class EmptyInstrumentationManager(object):
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, type, val, traceback):
-        pass
+        yield
