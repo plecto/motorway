@@ -1,41 +1,19 @@
-from botocore.exceptions import ClientError
-
+from motorway.contrib.amazon_sqs.mixins import SQSMixin
 from motorway.messages import Message
 from motorway.ramp import Ramp
 import boto3
 import json
 
 
-class SQSRamp(Ramp):
+class SQSRamp(Ramp, SQSMixin):
     queue_name = None
     json_group_key = None
 
     def __init__(self, *args, **kwargs):
         super(SQSRamp, self).__init__(*args, **kwargs)
         self.sqs = boto3.resource(**self.connection_parameters())
-        assert self.queue_name, "Please define attribute queue_name on your SQSRamp"
-        # Get queue from cache
-        try:
-            self.queue = self.get_queue_from_cache()
-        except NotImplementedError:
-            try:
-                self.queue = self.sqs.get_queue_by_name(QueueName=self.queue_name)
-            except ClientError as client_error:
-                # The queue doesn't exist and should be created
-                if client_error.response['Error']['Code'] == 'AWS.SimpleQueueService.NonExistentQueue':
-                    self.queue = self.sqs.create_queue(QueueName=self.queue_name)
-                else:
-                    raise client_error
+        self.init_queue()
         self.messages = {}
-
-    def connection_parameters(self):
-        return {
-            'region_name': 'eu-west-1',
-            'service_name': 'sqs'
-            # Add this or use ENV VARS
-            # 'aws_access_key_id': '',
-            # 'aws_secret_access_key': ''
-        }
 
     def next(self):
         for msg in self.queue.receive_messages(MaxNumberOfMessages=10, WaitTimeSeconds=5, VisibilityTimeout=10*60):
@@ -51,10 +29,3 @@ class SQSRamp(Ramp):
         if _id in self.messages:
             self.queue.delete_messages(Entries=[{'Id': _id, 'ReceiptHandle': self.messages[_id]}])  # TODO: Do this on ack
             del self.messages[_id]
-
-    """
-        Instead of calling the aws api to get the queue url needed to instantiate the Queue object,
-        You have the option to implement this method on the intersections using this class as Baseclass
-    """
-    def get_queue_from_cache(self):
-        raise NotImplementedError()
