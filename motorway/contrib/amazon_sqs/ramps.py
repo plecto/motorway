@@ -14,14 +14,18 @@ class SQSRamp(Ramp):
         super(SQSRamp, self).__init__(*args, **kwargs)
         self.sqs = boto3.resource(**self.connection_parameters())
         assert self.queue_name, "Please define attribute queue_name on your SQSRamp"
+        # Get queue from cache
         try:
-            self.queue = self.sqs.get_queue_by_name(QueueName=self.queue_name)
-        except ClientError as client_error:
-            # The queue doesn't exist and should be created
-            if client_error.response['Error']['Code'] == 'AWS.SimpleQueueService.NonExistentQueue':
-                self.queue = self.sqs.create_queue(QueueName=self.queue_name)
-            else:
-                raise client_error
+            self.queue = self.get_queue_from_cache()
+        except NotImplementedError:
+            try:
+                self.queue = self.sqs.get_queue_by_name(QueueName=self.queue_name)
+            except ClientError as client_error:
+                # The queue doesn't exist and should be created
+                if client_error.response['Error']['Code'] == 'AWS.SimpleQueueService.NonExistentQueue':
+                    self.queue = self.sqs.create_queue(QueueName=self.queue_name)
+                else:
+                    raise client_error
         self.messages = {}
 
     def connection_parameters(self):
@@ -47,3 +51,10 @@ class SQSRamp(Ramp):
         if _id in self.messages:
             self.queue.delete_messages(Entries=[{'Id': _id, 'ReceiptHandle': self.messages[_id]}])  # TODO: Do this on ack
             del self.messages[_id]
+
+    """
+        Instead of calling the aws api to get the queue url needed to instantiate the Queue object,
+        You have the option to implement this method on the intersections using this class as Baseclass
+    """
+    def get_queue_from_cache(self):
+        raise NotImplementedError()
