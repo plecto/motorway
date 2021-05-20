@@ -140,7 +140,7 @@ class AmazonKinesisTestCase(TestCase):
         kinesis_ramp2 = self.get_kinesis_ramp()
         kinesis_ramp3 = self.get_kinesis_ramp()
         worker_id = kinesis_ramp1.worker_id
-        for i in xrange(1, 11):
+        for i in range(1, 11):
             shard_id = "shard-%s" % str(i)
             shards.append(shard_id)
             if i == 11:
@@ -164,7 +164,7 @@ class AmazonKinesisTestCase(TestCase):
         kinesis_ramp3.control_table = table
 
         def change_heartbeat(seconds):
-            for j in xrange(1, 10):
+            for j in range(1, 10):
                 # change the first nines heartbeat to exclude them from rebalancing
                 table.get_item(Key={'shard_id': 'shard-%s' % j})['Item']['heartbeat'] += 1
 
@@ -173,7 +173,7 @@ class AmazonKinesisTestCase(TestCase):
             self.assertTrue(kinesis_ramp1.claim_shard("shard-10"))
 
         def change_heartbeat10(seconds):
-            for j in xrange(1, 11):
+            for j in range(1, 11):
                 # change the heartbeat for all shards so no workers seems idle
                 table.get_item(Key={'shard_id': 'shard-%s' % j})['Item']['heartbeat'] += 1
 

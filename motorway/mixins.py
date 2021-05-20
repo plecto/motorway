@@ -49,7 +49,7 @@ class SendMessageMixin(object):
                 process_id
             )
             if self.controller_sock and self.send_control_messages and control_message:
-                for index in xrange(0, retries):
+                for index in range(0, retries):
                     try:
                         message.send_control_message(
                             self.controller_sock,

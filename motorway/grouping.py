@@ -1,5 +1,5 @@
 import random
-from hash_ring import HashRing
+from motorway.hash_ring import HashRing
 import zmq
 import logging
 
