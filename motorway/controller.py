@@ -1,5 +1,7 @@
 import calendar
 import logging
+import queue
+
 from setproctitle import setproctitle
 from threading import Thread
 import time
@@ -11,6 +13,8 @@ from motorway.intersection import Intersection
 from motorway.utils import percentile_from_dict, set_timeouts_on_socket
 from isodate import parse_duration
 import zmq
+
+from queue import Queue
 
 
 logger = logging.getLogger(__name__)
@@ -32,10 +36,11 @@ class ControllerIntersection(Intersection):
         super(ControllerIntersection, self).__init__(**kwargs)
         self.stream_consumers = stream_consumers or {}
         self.ramp_socks = {}
-        self.messages = {}
+        self.messages = {}  # Dictionary of all messages which are currently "in flight", eg not successful or failed
         self.failed_messages = {}
         self.process_statistics = {}
         self.queue_processes = {}
+        self.failed_message_queue = Queue()
 
     def get_default_process_dict(self):
         return {
@@ -59,6 +64,24 @@ class ControllerIntersection(Intersection):
 
     @batch_process(wait=1, limit=500)
     def process(self, messages):
+        """
+        Receives control messages from all intersection and ramps and stores their state, XORing the ack values
+
+        Example:
+
+            {
+                'ack_value': 0,
+                'content': {
+                    'duration': 'PT1.39753S',
+                    'msg_type': 'ack',
+                    'process_name': 'e025542654244aa7af2fb9e2b1163b92'
+                },
+                'destination_uuid': '_ramp-64fc5ea4-3a37-46f4-a91f-6e9171511547',
+                'process_name': 'd6d3f120aa7e4a95b021c8739727050f',
+                'producer_uuid': '_ramp-64fc5ea4-3a37-46f4-a91f-6e9171511547',
+                'ramp_unique_id': '49611499808431666095155250883398338412426493042708447442'
+            }
+        """
         now = datetime.datetime.now()
         for message in messages:
             original_process = message.producer_uuid
@@ -119,35 +142,48 @@ class ControllerIntersection(Intersection):
                     self.process_statistics[current_process]['total_frequency'] = sum(self.process_statistics[current_process]['frequency'].values())
                     self.process_statistics[current_process]['95_percentile'] = datetime.timedelta(seconds=percentile_from_dict(self.process_statistics[current_process]['frequency'], 95))
                     self.process_statistics[current_process]['avg_time_taken'] = self.process_statistics[current_process]['time_taken'] / sum(self.process_statistics[current_process]['frequency'].values())
+
+        # Clean up failed messages received from .update() via the queue
+        # This is done here to avoid two threads modifying self.messages which is heavily in use
+        try:
+            while True:
+                unique_id = self.failed_message_queue.get_nowait()
+                print("Removing failed message", unique_id)
+                print(self.messages[unique_id])
+                del self.messages[unique_id]
+                self.failed_message_queue.task_done()
+        except queue.Empty:
+            pass
         yield  # Hack: This is actually done by self.update() to trigger it even if there are no messages and to reduce messages to 1/s
 
     def update(self):
+        """
+        Goes through all in flight messages, update statistics and forward to web intersection
+        """
         now = datetime.datetime.now()
 
         process_uuid_to_address = {uuid: address for address, uuid in self.process_address_to_uuid.items()}
 
         # Check message status
         waiting_messages = {}
-        messages_to_clean_up = []
-        for unique_id, lst in self.messages.items():
+        for unique_id, lst in self.messages.copy().items():  # don't work on self.messages
             original_process, ack_value, start_time, process = lst
             if unique_id in self.failed_messages:
                 # This failed somewhere else in the chain and it was notified already
-                messages_to_clean_up.append(unique_id)
-            elif process_uuid_to_address and process not in process_uuid_to_address:  # check if dict is empty before checking if the process is in it (mainly for tests)
-                messages_to_clean_up.append(unique_id)
+                self.failed_message_queue.put_nowait(unique_id)
+            elif process_uuid_to_address and process not in process_uuid_to_address:
+                # Assigned processed disappeared (mainly for tests)
+                self.failed_message_queue.put_nowait(unique_id)
                 self.process_statistics[process]['histogram'][now.minute]['timeout_count'] += 1
                 self.fail(unique_id, original_process, error_message="Assigned processed disappeared")
             elif (now - start_time) > datetime.timedelta(minutes=self.MESSAGE_TIMEOUT):
-                messages_to_clean_up.append(unique_id)
+                # Message was not completed in MESSAGE_TIMEOUT (default 30 minnutes)
+                self.failed_message_queue.put_nowait(unique_id)
                 self.process_statistics[process]['histogram'][now.minute]['timeout_count'] += 1
                 self.fail(unique_id, original_process, error_message="Message timed out")
             elif ack_value > 0:
+                # Message is in flight and not completed
                 waiting_messages[process] = waiting_messages.get(process, 0) + 1
-
-        # clean up
-        for unique_id in messages_to_clean_up:
-            del self.messages[unique_id]
 
         # Update histograms
         for process in self.process_statistics.keys():
