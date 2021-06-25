@@ -110,15 +110,15 @@ class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
         thread_results.start()
 
         while True:
-            if not thread_update_connections.isAlive():
+            if not thread_update_connections.is_alive():
                 logger.error("Thread thread_update_connections crashed in %s" % self.__class__.__name__)
                 thread_update_connections = thread_update_connections_factory()
                 thread_update_connections.start()
-            if not thread_main.isAlive():
+            if not thread_main.is_alive():
                 logger.error("Thread thread_main crashed in %s" % self.__class__.__name__)
                 thread_main = thread_main_factory()
                 thread_main.start()
-            if not thread_results.isAlive():
+            if not thread_results.is_alive():
                 logger.error("Thread thread_results crashed in %s" % self.__class__.__name__)
                 thread_results = thread_results_factory()
                 thread_results.start()

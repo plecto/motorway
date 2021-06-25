@@ -81,7 +81,7 @@ class Message(object):
             self.producer_uuid = producer_uuid
         elif not self.producer_uuid:
             assert self.producer_uuid
-        queue.send(
+        queue.send_string(
             self.as_json()
         )
 

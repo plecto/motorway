@@ -41,7 +41,7 @@ class RandomGrouper(BaseGrouper):
     Select a random intersection to receive the message
     """
     def get_destinations_for(self, value):
-        return [random.choice(self.destinations)]
+        return [random.choice(list(self.destinations))]
 
 
 class SendToAllGrouper(BaseGrouper):

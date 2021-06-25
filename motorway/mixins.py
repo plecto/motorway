@@ -92,7 +92,7 @@ class ConnectionMixin(object):
                           grouper_cls=None, set_controller_sock=True):
         refresh_connection_sock = context.socket(zmq.SUB)
         refresh_connection_sock.connect(refresh_connection_stream)
-        refresh_connection_sock.setsockopt(zmq.SUBSCRIBE, '')  # You must subscribe to something, so this means *all*}
+        refresh_connection_sock.setsockopt_string(zmq.SUBSCRIBE, '')  # You must subscribe to something, so this means *all*}
         set_timeouts_on_socket(refresh_connection_sock)
 
         connections = get_connections_block('_update_connections', refresh_connection_sock)

@@ -32,7 +32,7 @@ class ThreadRunner(object):
         # Monitor and restart factories if needed
         while True:
             for factory, thread in factories.items():
-                if not thread.isAlive():
+                if not thread.is_alive():
                     logger.warn("Thread %s crashed in %s. Restarting" % (factory(), self.__class__.__name__))
                     factories[factory] = factory()
                     factories[factory].start()

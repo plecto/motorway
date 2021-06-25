@@ -49,7 +49,7 @@ class AggregateConsumerIntersection(Intersection):
     def process(self, message):
         self._count.update(message.content)
         self.ack(message)
-        print "Aggregate: ", self.process_uuid, self._count
+        # print("Aggregate: ", self.process_uuid, self._count)
         yield
 
 

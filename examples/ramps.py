@@ -42,7 +42,7 @@ class WordRamp(Ramp):
         #print "WordRamp %s was successful" % _id
 
     def failed(self, _id):
-        print "WordRamp %s has failed" % _id
+        print("WordRamp %s has failed" % _id)
 
     def should_run(self):
         return True
