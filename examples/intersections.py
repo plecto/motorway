@@ -53,6 +53,5 @@ class AggregateConsumerIntersection(Intersection):
         yield
 
 
-
 class ExampleSQSIntersection(SQSInsertIntersection):
     queue_name = "tutorial_motorway"

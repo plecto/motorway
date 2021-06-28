@@ -37,10 +37,10 @@ logging.config.dictConfig({
 })
 
 
-
 class ConnectionPipeline(Pipeline):
     def definition(self):
         pass
 
 
-ConnectionPipeline(run_controller=False, run_webserver=False, run_connection_discovery=True).run()
+if __name__ == '__main__':
+    ConnectionPipeline(run_controller=False, run_webserver=False, run_connection_discovery=True).run()

@@ -76,4 +76,5 @@ class SamplePipeline(Pipeline):
         self.add_intersection(SampleDatabaseInsertIntersection, 'insert_db')
 
 
-SamplePipeline().run()
+if __name__ == '__main__':
+    SamplePipeline().run()

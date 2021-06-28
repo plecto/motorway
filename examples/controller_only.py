@@ -6,4 +6,5 @@ class ControllerPipeline(Pipeline):
         pass
 
 
-ControllerPipeline(run_controller=True, run_webserver=False, run_connection_discovery=False, controller_bind_address="connections:7007").run()
+if __name__ == '__main__':
+    ControllerPipeline(run_controller=True, run_webserver=False, run_connection_discovery=False, controller_bind_address="connections:7007").run()

@@ -52,4 +52,5 @@ class WordCountPipeline(Pipeline):
         self.add_intersection(AggregateIntersection, 'word_count', processes=1)
 
 
-WordCountPipeline(run_controller=False, run_webserver=False).run()
+if __name__ == '__main__':
+    WordCountPipeline(run_controller=False, run_webserver=False).run()

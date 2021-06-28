@@ -18,4 +18,5 @@ class WordCountPipeline(Pipeline):
         self.add_intersection(WordCountIntersection, 'word_from_sqs')
 
 
-WordCountPipeline().run()
+if __name__ == '__main__':
+    WordCountPipeline().run()
