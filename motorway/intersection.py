@@ -1,5 +1,8 @@
+try:
+    from queue import Empty
+except ImportError:
+    from Queue import Empty
 import random
-from Queue import Empty
 import logging
 import multiprocessing
 from threading import Thread

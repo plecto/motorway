@@ -1,6 +1,10 @@
+try:
+    from queue import Queue, Empty
+except ImportError:
+    from Queue import Queue, Empty
+
 import calendar
 import logging
-import queue
 
 from setproctitle import setproctitle
 from threading import Thread
@@ -13,8 +17,6 @@ from motorway.intersection import Intersection
 from motorway.utils import percentile_from_dict, set_timeouts_on_socket
 from isodate import parse_duration
 import zmq
-
-from queue import Queue
 
 
 logger = logging.getLogger(__name__)
@@ -152,7 +154,7 @@ class ControllerIntersection(Intersection):
                 print(self.messages[unique_id])
                 del self.messages[unique_id]
                 self.failed_message_queue.task_done()
-        except queue.Empty:
+        except Empty:
             pass
         yield  # Hack: This is actually done by self.update() to trigger it even if there are no messages and to reduce messages to 1/s
 
