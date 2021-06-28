@@ -1,7 +1,7 @@
 from motorway.contrib.amazon_sqs.mixins import SQSMixin
 from motorway.intersection import Intersection
 import boto3
-from utils import sqs_encode_to_json
+from .utils import sqs_encode_to_json
 
 
 class SQSInsertIntersection(Intersection, SQSMixin):
