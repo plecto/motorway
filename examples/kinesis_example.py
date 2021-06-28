@@ -53,4 +53,5 @@ class WordCountPipeline(Pipeline):
         self.add_intersection(AggregateIntersection, 'word_count', grouper_cls=HashRingGrouper, processes=1)
 
 
-WordCountPipeline().run()
+if __name__ == '__main__':
+    WordCountPipeline().run()

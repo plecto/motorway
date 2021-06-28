@@ -42,4 +42,5 @@ class WebPipeline(Pipeline):
         pass
 
 
-WebPipeline(run_controller=False, run_webserver=True, run_connection_discovery=False, controller_bind_address="connections:7007").run()
+if __name__ == '__main__':
+    WebPipeline(run_controller=False, run_webserver=True, run_connection_discovery=False, controller_bind_address="connections:7007").run()
