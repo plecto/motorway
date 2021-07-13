@@ -101,7 +101,7 @@ will start sending metrics. You can find them in New Relic as non-web transactio
 
 License
 =======
-   Copyright 2014 Plecto ApS
+   Copyright 2014-2021 Plecto ApS
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
