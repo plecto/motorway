@@ -86,7 +86,7 @@ class Message(object):
 
         queue.send_string(
             self.as_json(),
-            flags=zmq.backend.cython.constants.NOBLOCK
+            flags=zmq.backend.cython.constants.NOBLOCK # Raise and exception if the queue is full.
         )
 
     def send_control_message(self, controller_queue, time_consumed=None, process_name=None, destination_endpoint=None,
