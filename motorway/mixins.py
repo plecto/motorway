@@ -1,6 +1,7 @@
 import datetime
 
 import itertools
+import logging
 import random
 import socket
 import uuid
@@ -12,6 +13,9 @@ from motorway.exceptions import SocketBlockedException
 from motorway.grouping import HashRingGrouper, RandomGrouper, GroupingValueMissing, SendToAllGrouper
 from motorway.messages import Message
 from motorway.utils import set_timeouts_on_socket, get_connections_block, get_ip
+
+
+logger = logging.getLogger(__name__)
 
 
 class GrouperMixin(object):
@@ -44,10 +48,17 @@ class SendMessageMixin(object):
         except GroupingValueMissing:
             raise GroupingValueMissing("Message '%s' provided an invalid grouping_value: '%s'" % (message.content, message.grouping_value))
         for destination in socket_addresses:
-            message.send(
-                self.send_socks[destination],
-                process_id
-            )
+            for index in range(0, retries):
+                try:
+                    message.send(
+                        self.send_socks[destination],
+                        process_id
+                    )
+                    break
+                except zmq.Again:
+                    logger.warning("Failed to send message from %s (%s/%s)", process_id, index, retries)
+                    time.sleep(10)
+
             if self.controller_sock and self.send_control_messages and control_message:
                 for index in xrange(0, retries):
                     try:
@@ -59,8 +70,9 @@ class SendMessageMixin(object):
                             destination_endpoint=destination,
                             sender=sender
                         )
-                        break
+                        break  # Exit retry
                     except KeyError:  # If destination is not known, lookup fails
+                        logger.warning("Destination unknown for message %s, sender %s", message, sender)
                         time.sleep(random.randrange(1, 3))  # random to avoid peak loads when running multiple processes
                     except zmq.Again:  # If connection fails, retry
                         time.sleep(random.randrange(1, 3))

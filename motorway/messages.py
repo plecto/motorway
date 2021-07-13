@@ -3,6 +3,8 @@ import multiprocessing
 import traceback
 import uuid
 import datetime
+
+import zmq.backend.cython.constants
 from isodate import duration_isoformat
 from motorway.utils import DateTimeAwareJsonEncoder
 import logging
@@ -81,8 +83,10 @@ class Message(object):
             self.producer_uuid = producer_uuid
         elif not self.producer_uuid:
             assert self.producer_uuid
-        queue.send(
-            self.as_json()
+
+        queue.send_string(
+            self.as_json(),
+            flags=zmq.backend.cython.constants.NOBLOCK
         )
 
     def send_control_message(self, controller_queue, time_consumed=None, process_name=None, destination_endpoint=None,
@@ -113,7 +117,7 @@ class Message(object):
             'producer_uuid': self.producer_uuid,
             'destination_endpoint': destination_endpoint,
             'destination_uuid': destination_uuid
-        })
+        }, flags=zmq.backend.cython.constants.NOBLOCK)
 
     def ack(self, time_consumed=None):
         """
