@@ -49,7 +49,7 @@ class SendMessageMixin(object):
             raise GroupingValueMissing("Message '%s' provided an invalid grouping_value: '%s'" % (message.content, message.grouping_value))
         for destination in socket_addresses:
             # Keep trying to send the message until successful
-            retries = 0
+            message_retries = 0
             while True:
                 try:
                     message.send(
@@ -59,12 +59,12 @@ class SendMessageMixin(object):
                     break
                 # Queue was full or not available
                 except zmq.Again as e:
-                    retries +=1
-                    logger.warning("Failed to send message from %s (retry # %s)", process_id, retries)
+                    message_retries +=1
+                    logger.warning("Failed to send message from %s (retry # %s)", process_id, message_retries)
                     time.sleep(5)
 
             if self.controller_sock and self.send_control_messages and control_message:
-                for index in xrange(0, retries):
+                for index in range(0, retries):
                     try:
                         message.send_control_message(
                             self.controller_sock,
