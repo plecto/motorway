@@ -80,12 +80,16 @@ class ConnectionIntersection(Intersection):
         }
         while True:
             for queue, consumers in self.queue_processes.items():
+                consumers_to_remove = []
                 for consumer, heartbeat_info in consumers['stream_heartbeats'].items():
                     if current_heartbeat() > (heartbeat_info['heartbeat'] + self.HEARTBEAT_TIMEOUT):
-                        logger.warn("Removing %s from %s due to missing heartbeat" % (consumer, queue))
-                        self.queue_processes[queue]['streams'].remove(consumer)
-                        self.queue_processes[queue]['stream_heartbeats'].pop(consumer)
-                        # self.process_statistics[heartbeat_info['process_id']]['status'] = 'failed'
+                        consumers_to_remove.append(consumer)
+
+                for consumer in consumers_to_remove:
+                    logger.warn("Removing %s from %s due to missing heartbeat" % (consumer, queue))
+                    self.queue_processes[queue]['streams'].remove(consumer)
+                    self.queue_processes[queue]['stream_heartbeats'].pop(consumer)
+                    # self.process_statistics[heartbeat_info['process_id']]['status'] = 'failed'
 
             # Send the current connections
             broadcast_connection_sock.send_json(self.queue_processes)
