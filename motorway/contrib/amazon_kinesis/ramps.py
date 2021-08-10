@@ -218,7 +218,7 @@ class KinesisRamp(Ramp):
 
                 # get initial iterator
                 control_record = self.control_table.get_item(Key={'shard_id': shard_id})['Item']
-                if control_record['checkpoint'] > 0:
+                if control_record['checkpoint']:
                     # if we have a checkpoint, start from the checkpoint
                     iterator = self.conn.get_shard_iterator(
                         StreamName=self.stream_name,
