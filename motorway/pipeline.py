@@ -115,6 +115,11 @@ class Pipeline(object):
         if self.run_webserver:
             self.add_intersection(WebserverIntersection, '_web_server', grouper_cls=SendToAllGrouper)  # all webservers should receive messages
 
+        # The Controller, Connection, and Webserver-intersection must be started first so any
+        # other intersection and ramp can successfully connect to them.
+        # The list of processes should therefore be reversed to ensure that these intersections are started first.
+        self._processes.reverse()
+
         logger.debug("Running pipeline")
         for process in self._processes:
             process.start()
