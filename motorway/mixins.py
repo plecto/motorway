@@ -46,16 +46,14 @@ class SendMessageMixin(object):
         try:
             socket_addresses = self.grouper_instance.get_destinations_for(message.grouping_value)
         except GroupingValueMissing:
-            raise GroupingValueMissing("Message '%s' provided an invalid grouping_value: '%s'" % (message.content, message.grouping_value))
+            raise GroupingValueMissing("Message '%s' provided an invalid grouping_value: '%s'" %
+                                       (message.content, message.grouping_value))
         for destination in socket_addresses:
             # Keep trying to send the message until successful
             message_retries = 0
             while True:
                 try:
-                    message.send(
-                        self.send_socks[destination],
-                        process_id
-                    )
+                    message.send(self.send_socks[destination], process_id)
                     break
                 # Queue was full or not available
                 except zmq.Again as e:
