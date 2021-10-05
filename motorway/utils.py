@@ -44,6 +44,14 @@ class DateTimeAwareJsonEncoder(JSONEncoder):
 
 
 def set_timeouts_on_socket(scket):
+    """
+    Applies a set of options to a socket.
+
+    IMPORTANT: These options should be applied before binding/connecting
+    to a socket, as they will otherwise have no effect!
+
+    :param scket: 'context.socket'-instance
+    """
     # Duration before returning AGAIN-exception when receiving messages
     scket.RCVTIMEO = 10000
     # Duration before returning AGAIN-exception when trying to send messages
@@ -59,7 +67,7 @@ def set_timeouts_on_socket(scket):
     scket.HEARTBEAT_IVL = 2000
     # Duration before a socket connection will time out if no heartbeat (PING/PONG) is received
     # When this happens, the socket will automatically try to reconnect
-    scket.HEARTBEAT_TTL = 200
+    scket.HEARTBEAT_TTL = 500
 
 
 def get_connections_block(queue, refresh_connection_socket, limit=100, existing_connections=None):
