@@ -2,7 +2,6 @@ import logging
 import multiprocessing
 from setproctitle import setproctitle
 import time
-import zmq
 
 logger = logging.getLogger(__name__)
 

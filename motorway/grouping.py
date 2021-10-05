@@ -1,6 +1,5 @@
 import random
 from motorway.hash_ring import HashRing
-import zmq
 import logging
 
 logger = logging.getLogger(__name__)
