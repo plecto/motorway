@@ -1,7 +1,7 @@
 import decimal
 from json import JSONEncoder
 import datetime
-from isodate import parse_duration, duration_isoformat, datetime_isoformat
+from isodate import duration_isoformat, datetime_isoformat
 import zmq
 import socket
 

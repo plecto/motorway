@@ -1,10 +1,8 @@
 import calendar
 import logging
 import datetime
-import socket
 
 from motorway.intersection import Intersection
-from motorway.messages import Message
 from motorway.utils import set_timeouts_on_socket, get_ip
 import time
 import zmq

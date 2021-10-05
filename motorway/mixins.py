@@ -2,8 +2,6 @@ import datetime
 
 import itertools
 import random
-import socket
-import uuid
 
 import zmq
 import time

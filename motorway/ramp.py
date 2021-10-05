@@ -3,14 +3,10 @@ import multiprocessing
 from setproctitle import setproctitle
 import datetime
 from threading import Thread
-import uuid
-from motorway.grouping import GroupingValueMissing
-from motorway.messages import Message
 from motorway.mixins import GrouperMixin, SendMessageMixin, ConnectionMixin
-from motorway.utils import set_timeouts_on_socket, get_connections_block
+from motorway.utils import set_timeouts_on_socket
 import zmq
 import time
-import random
 
 
 logger = logging.getLogger(__name__)
