@@ -151,6 +151,9 @@ class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
 
         while True:
             if not self.send_socks:
+                # 'self.send_socks' is set in the 'ConnectionMixin' once the corresponding intersection
+                # has successfully connected to the ConnectionIntersection and marked itself as a consumer
+                # of the input stream, which is the ramp in this case.
                 logger.debug("Waiting for send_socks")
                 time.sleep(1)
             elif self.should_run():

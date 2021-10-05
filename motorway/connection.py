@@ -38,6 +38,10 @@ class ConnectionIntersection(Intersection):
         self.bind_address = bind_address
 
     def process(self, message):
+        """
+        Receives messages from ramps and intersections updating their latest heartbeat
+        and registers intersections as a consumer of the corresponding streams.
+        """
         connection_updates = message.content
         self.process_id_to_name[connection_updates['meta']['id']] = connection_updates['meta']['name']
         for queue, consumers in connection_updates['streams'].items():
@@ -63,6 +67,11 @@ class ConnectionIntersection(Intersection):
         yield
 
     def connection_thread(self, context=None, **kwargs):
+        """
+        Broadcasts available and active connections to all ramps/intersections listening.
+
+        Automatically removes consumers of a stream upon missing heartbeats from the consumer.
+        """
         while not self.receive_port:
             time.sleep(1)
 

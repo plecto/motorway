@@ -71,6 +71,16 @@ def set_timeouts_on_socket(scket):
 
 
 def get_connections_block(queue, refresh_connection_socket, limit=100, existing_connections=None):
+    """
+    Will keep refreshing the available connections until the selected queue is available within
+    the dictionary of returned connections, or if the max number of retries 'limit' is reached.
+
+    :param queue: str, name of the queue to search for among all connections
+    :param refresh_connection_socket: str, TCP-address of the ConnectionIntersection
+    :param limit: int, number of attempts to receive connections
+    :param existing_connections: (Optional) dict, containing existing connections to include
+    :return: dict, containing all connections fetched from the ConnectionIntersection or 'existing_connections'
+    """
     i = 0
     connections = existing_connections if existing_connections else {}
     while queue not in connections and i < limit:
