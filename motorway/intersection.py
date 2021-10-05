@@ -168,8 +168,8 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
 
         """
         receive_sock = context.socket(zmq.PULL)
-        self.receive_port = receive_sock.bind_to_random_port("tcp://*")
         set_timeouts_on_socket(receive_sock)
+        self.receive_port = receive_sock.bind_to_random_port("tcp://*")
 
         if self.send_control_messages:
             while not self.controller_sock:

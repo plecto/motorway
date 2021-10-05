@@ -91,9 +91,9 @@ class ConnectionMixin(object):
     def connection_thread(self, context=None, refresh_connection_stream=None, input_queue=None, output_queue=None,
                           grouper_cls=None, set_controller_sock=True):
         refresh_connection_sock = context.socket(zmq.SUB)
+        set_timeouts_on_socket(refresh_connection_sock)
         refresh_connection_sock.connect(refresh_connection_stream)
         refresh_connection_sock.setsockopt(zmq.SUBSCRIBE, '')  # You must subscribe to something, so this means *all*}
-        set_timeouts_on_socket(refresh_connection_sock)
 
         connections = get_connections_block('_update_connections', refresh_connection_sock)
 
@@ -102,6 +102,7 @@ class ConnectionMixin(object):
 
         # Register as consumer of input stream
         update_connection_sock = context.socket(zmq.PUSH)
+        set_timeouts_on_socket(update_connection_sock)
         update_connection_sock.connect(connections['_update_connections']['streams'][0])
         intersection_connection_info = {
             'streams': {
@@ -119,8 +120,8 @@ class ConnectionMixin(object):
         if set_controller_sock:
             connections = get_connections_block('_message_ack', refresh_connection_sock, existing_connections=connections)
             self.controller_sock = context.socket(zmq.PUSH)
-            self.controller_sock.connect(connections['_message_ack']['streams'][0])
             set_timeouts_on_socket(self.controller_sock)
+            self.controller_sock.connect(connections['_message_ack']['streams'][0])
         while True:
             try:
                 connections = refresh_connection_sock.recv_json()

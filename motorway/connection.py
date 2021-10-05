@@ -70,8 +70,8 @@ class ConnectionIntersection(Intersection):
 
         # The publish/broadcast socket where clients subscribe to updates
         broadcast_connection_sock = context.socket(zmq.PUB)
-        broadcast_connection_sock.bind(self.bind_address)
         set_timeouts_on_socket(broadcast_connection_sock)
+        broadcast_connection_sock.bind(self.bind_address)
 
         self.queue_processes['_update_connections'] = {
             'streams': ['tcp://%s:%s' % (get_ip(), self.receive_port)],
