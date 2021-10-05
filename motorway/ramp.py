@@ -126,9 +126,9 @@ class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
 
     def receive_replies(self, context=None):
         result_sock = context.socket(zmq.PULL)
+        set_timeouts_on_socket(result_sock)
         self.receive_port = result_sock.bind_to_random_port("tcp://*")
         logger.debug("Result port is %s" % self.receive_port)
-        set_timeouts_on_socket(result_sock)
 
         while True:
             try:
