@@ -96,7 +96,7 @@ class ConnectionMixin(object):
     def connection_thread(self, context=None, refresh_connection_stream=None, input_queue=None, output_queue=None,
                           grouper_cls=None, set_controller_sock=True):
         """
-        Responsible for managing and connecting to 'input_queue' and 'output_queue' for a ramp or rntersection.
+        Responsible for managing and connecting to 'input_queue' and 'output_queue' for a ramp or intersection.
 
         It is also responsible for sending heartbeats to the ConnectionIntersection and marking itself
         as a consumer of an 'input_queue', which can be either a ramp or intersection.
