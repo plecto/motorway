@@ -1,4 +1,5 @@
 import decimal
+import os
 from json import JSONEncoder
 import datetime
 from isodate import duration_isoformat, datetime_isoformat
@@ -53,21 +54,21 @@ def set_timeouts_on_socket(scket):
     :param scket: 'context.socket'-instance
     """
     # Duration before returning AGAIN-exception when receiving messages
-    scket.RCVTIMEO = 10000
+    scket.RCVTIMEO = int(os.environ.get('ZMQ_RCVTIMEO', -1))
     # Duration before returning AGAIN-exception when trying to send messages
-    scket.SNDTIMEO = 10000
+    scket.SNDTIMEO = int(os.environ.get('ZMQ_SNDTIMEO', -1))
     # How long to keep messages in memory after a socket disconnects
-    scket.LINGER = 1000
+    scket.LINGER = int(os.environ.get('ZMQ_LINGER', 30000))
 
     # The below two options are important to reconnect failed socket connections
     # Failed connections can occur when starting many intersections and ramps at once
     # Connections that time out will keep attempting to reconnect automatically
 
     # Interval between each ZMTP heartbeat to the socket
-    scket.HEARTBEAT_IVL = 2000
+    scket.HEARTBEAT_IVL = int(os.environ.get('ZMQ_HEARTBEAT_IVL', 0))
     # Duration before a socket connection will time out if no heartbeat (PING/PONG) is received
     # When this happens, the socket will automatically try to reconnect
-    scket.HEARTBEAT_TTL = 500
+    scket.HEARTBEAT_TTL = int(os.environ.get('ZMQ_HEARTBEAT_TTL', 0))
 
 
 def get_connections_block(queue, refresh_connection_socket, limit=100, existing_connections=None):
