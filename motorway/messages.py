@@ -1,7 +1,10 @@
 import json
+import time
 import traceback
 import uuid
 import datetime
+
+import zmq
 from isodate import duration_isoformat
 from motorway.utils import DateTimeAwareJsonEncoder
 import logging
@@ -114,21 +117,33 @@ class Message(object):
             'destination_uuid': destination_uuid
         })
 
-    def ack(self, time_consumed=None):
+    def ack(self, time_consumed=None, max_send_retries=10):
         """
-        Send a message to the controller that this message was properly processed
+        Send a message to the controller that this message was properly processed.
+
+        Will try resending the message if the ControllerIntersection is unavailable.
         """
-        self.controller_queue.send_json({
-            'ramp_unique_id': self.ramp_unique_id,
-            'ack_value': self.ack_value,
-            'content': {
-                'process_name': self.process_name,
-                'msg_type': 'ack',
-                'duration': duration_isoformat(time_consumed or (datetime.datetime.now() - self.init_time))
-            },
-            'producer_uuid': self.producer_uuid,
-            'destination_uuid': self.producer_uuid
-        })
+        send_retries = 0
+        while True:
+            try:
+                self.controller_queue.send_json({
+                    'ramp_unique_id': self.ramp_unique_id,
+                    'ack_value': self.ack_value,
+                    'content': {
+                        'process_name': self.process_name,
+                        'msg_type': 'ack',
+                        'duration': duration_isoformat(time_consumed or (datetime.datetime.now() - self.init_time))
+                    },
+                    'producer_uuid': self.producer_uuid,
+                    'destination_uuid': self.producer_uuid
+                })
+                break
+            except zmq.Again as e:
+                # Raise exception or retry sending the message
+                if send_retries >= max_send_retries:
+                    raise e
+                send_retries += 1
+                time.sleep(5)
 
     def fail(self, error_message="", capture_exception=True):
         """
