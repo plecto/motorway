@@ -54,8 +54,20 @@ def set_timeouts_on_socket(scket):
     """
     # Duration before returning AGAIN-exception when receiving messages
     scket.RCVTIMEO = 10000
+    # Duration before returning AGAIN-exception when trying to send messages
     scket.SNDTIMEO = 10000
+    # How long to keep messages in memory after a socket disconnects
     scket.LINGER = 1000
+
+    # The below two options are important to reconnect failed socket connections
+    # Failed connections can occur when starting many intersections and ramps at once
+    # Connections that time out will keep attempting to reconnect automatically
+
+    # Interval between each ZMTP heartbeat to the socket
+    scket.HEARTBEAT_IVL = 2000
+    # Duration before a socket connection will time out if no heartbeat (PING/PONG) is received
+    # When this happens, the socket will automatically try to reconnect
+    scket.HEARTBEAT_TTL = 500
 
 
 def get_connections_block(queue, refresh_connection_socket, limit=100, existing_connections=None):
