@@ -1,7 +1,7 @@
 import decimal
 from json import JSONEncoder
 import datetime
-from isodate import parse_duration, duration_isoformat, datetime_isoformat
+from isodate import duration_isoformat, datetime_isoformat
 import zmq
 import socket
 
@@ -44,12 +44,31 @@ class DateTimeAwareJsonEncoder(JSONEncoder):
 
 
 def set_timeouts_on_socket(scket):
+    """
+    Applies a set of options to a socket.
+
+    IMPORTANT: These options should be applied before binding/connecting
+    to a socket, as they will otherwise have no effect!
+
+    :param scket: 'context.socket'-instance
+    """
+    # Duration before returning AGAIN-exception when receiving messages
     scket.RCVTIMEO = 10000
     scket.SNDTIMEO = 10000
     scket.LINGER = 1000
 
 
 def get_connections_block(queue, refresh_connection_socket, limit=100, existing_connections=None):
+    """
+    Will keep refreshing the available connections until the selected queue is available within
+    the dictionary of returned connections, or if the max number of retries 'limit' is reached.
+
+    :param queue: str, name of the queue to search for among all connections
+    :param refresh_connection_socket: str, TCP-address of the ConnectionIntersection
+    :param limit: int, number of attempts to receive connections
+    :param existing_connections: (Optional) dict, containing existing connections to include
+    :return: dict, containing all connections fetched from the ConnectionIntersection or 'existing_connections'
+    """
     i = 0
     connections = existing_connections if existing_connections else {}
     while queue not in connections and i < limit:

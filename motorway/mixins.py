@@ -2,8 +2,6 @@ import datetime
 
 import itertools
 import random
-import socket
-import uuid
 
 import zmq
 import time
@@ -71,6 +69,13 @@ class SendMessageMixin(object):
 
 class ConnectionMixin(object):
     def set_send_socks(self, connections, output_queue, context):
+        """
+        Sets the sockets for which any outgoing messages should be sent to.
+
+        :param connections: dict, containing all available queues and streams
+        :param output_queue: str, name of the queue to output messages to
+        :param context: 'zmq.Context'-instance
+        """
         for send_conn in connections[output_queue]['streams']:
             if send_conn not in self.send_socks:
                 send_sock = context.socket(zmq.PUSH)
@@ -90,6 +95,19 @@ class ConnectionMixin(object):
 
     def connection_thread(self, context=None, refresh_connection_stream=None, input_queue=None, output_queue=None,
                           grouper_cls=None, set_controller_sock=True):
+        """
+        Responsible for managing and connecting to 'input_queue' and 'output_queue' for a ramp or intersection.
+
+        It is also responsible for sending heartbeats to the ConnectionIntersection and marking itself
+        as a consumer of an 'input_queue', which can be either a ramp or intersection.
+
+        :param context: 'zmq.Context'-instance
+        :param refresh_connection_stream: str, TCP-address of the ConnectionIntersection
+        :param input_queue: str, name of the queue to receive messages from
+        :param output_queue: str, name of the queue to output messages to
+        :param grouper_cls: (Optional) Grouper-class inheriting from BaseGrouper
+        :param set_controller_sock: bool, determines whether or not to track messages in the ControllerIntersection
+        """
         refresh_connection_sock = context.socket(zmq.SUB)
         set_timeouts_on_socket(refresh_connection_sock)
         refresh_connection_sock.connect(refresh_connection_stream)

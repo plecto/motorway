@@ -3,10 +3,8 @@ try:
 except ImportError:
     from Queue import Queue, Empty
 
-import calendar
 import logging
 
-from setproctitle import setproctitle
 from threading import Thread
 import time
 import datetime
@@ -14,7 +12,7 @@ import uuid
 from motorway.decorators import batch_process
 from motorway.messages import Message
 from motorway.intersection import Intersection
-from motorway.utils import percentile_from_dict, set_timeouts_on_socket
+from motorway.utils import percentile_from_dict
 from isodate import parse_duration
 import zmq
 

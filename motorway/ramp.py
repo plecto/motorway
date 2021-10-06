@@ -3,14 +3,10 @@ import multiprocessing
 from setproctitle import setproctitle
 import datetime
 from threading import Thread
-import uuid
-from motorway.grouping import GroupingValueMissing
-from motorway.messages import Message
 from motorway.mixins import GrouperMixin, SendMessageMixin, ConnectionMixin
-from motorway.utils import set_timeouts_on_socket, get_connections_block
+from motorway.utils import set_timeouts_on_socket
 import zmq
 import time
-import random
 
 
 logger = logging.getLogger(__name__)
@@ -155,6 +151,9 @@ class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
 
         while True:
             if not self.send_socks:
+                # 'self.send_socks' is set in the 'ConnectionMixin' once the corresponding intersection
+                # has successfully connected to the ConnectionIntersection and marked itself as a consumer
+                # of the input stream, which is the ramp in this case.
                 logger.debug("Waiting for send_socks")
                 time.sleep(1)
             elif self.should_run():
