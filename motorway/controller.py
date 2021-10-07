@@ -146,7 +146,8 @@ class ControllerIntersection(Intersection):
         try:
             while True:
                 unique_id = self.failed_message_queue.get_nowait()
-                del self.messages[unique_id]
+                if unique_id in self.messages:
+                    del self.messages[unique_id]
                 self.failed_message_queue.task_done()
         except queue.Empty:
             pass
