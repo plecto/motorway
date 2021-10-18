@@ -183,7 +183,7 @@ class ControllerIntersection(Intersection):
                 waiting_messages[process] = waiting_messages.get(process, 0) + 1
 
         # Update histograms
-        for process in self.process_statistics.keys():
+        for process in self.process_statistics.copy().keys():
             self.process_statistics[process]['histogram'][(now + datetime.timedelta(minutes=1)).minute] = self.get_default_process_dict()['histogram'][0]  # reset next minute
             self.process_statistics[process]['waiting'] = waiting_messages.get(process, 0)
 
