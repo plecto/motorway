@@ -5,7 +5,7 @@ class ZMQSockMock(object):
     def __init__(self, control_messages):
         self.control_messages = control_messages
 
-    def send_json(self, message):
+    def send_json(self, message, flags=None):
         self.control_messages.append(message)
 
 
