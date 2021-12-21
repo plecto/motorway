@@ -1,3 +1,4 @@
+import os
 import random
 from queue import Empty
 import logging
@@ -165,6 +166,10 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
 
         """
         receive_sock = context.socket(zmq.PULL)
+        # Allow overwriting buffer sizes to increase/decrease size of the process queues
+        # Default is equal to around 12.000 queued messages per process (depending on the OS-config)
+        receive_sock.SNDBUF = os.environ.get('MOTORWAY_SOCKET_SNDBUF', -1)
+        receive_sock.RCVBUF = os.environ.get('MOTORWAY_SOCKET_RCVBUF', -1)
         self.receive_port = receive_sock.bind_to_random_port("tcp://*")
         set_timeouts_on_socket(receive_sock)
 
