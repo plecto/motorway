@@ -280,14 +280,30 @@ body.disconnected #disconnected-message {
  * * * * * * * * * * * * * * * * * *
 */
 
-.failed-message {
-	font-size: 200%;
-	margin: 15px;
-	padding: 15px;
-	border: 1px solid rgba(255,255,255,0.2);
-	border-radius: 5px;
+.message-detail {
+	text-align: center;
 }
 
+.message-detail-header {
+	margin-top: 10px;
+	margin-bottom: 40px;
+}
+
+.message-detail h1 {
+	padding: 10px 0;
+}
+
+.message-detail-list {
+	margin: 15px 0;
+}
+
+.message-detail-list table {
+	padding: 15px;
+	margin: 15px auto;
+	border: 1px solid rgba(255,255,255,0.2);
+	border-radius: 5px;
+	width: 95%;
+}
 
 /*
  * Group

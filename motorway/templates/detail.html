@@ -10,21 +10,45 @@
 	<script src="https://code.jquery.com/jquery-1.11.2.min.js"></script>
 </head>
 <body>
-	<h1>{{ process }}</h1>
-    <h2>Errors</h2>
-    <table width="100%">
-        <tr>
-            <th>Date</th>
-            <th>Message</th>
-            <th>Exception</th>
-        </tr>
-        {% for date, process, exception, message in failed_messages %}
-            <tr>
-                <td>{{ date }}</td>
-                <td><pre>{{ message }}</pre></td>
-                <td><pre>{{ exception }}</pre></td>
-            </tr>
-        {% endfor %}
-    </table>
+    <div class="message-detail">
+        <div class="message-detail-header">
+            <h1>Process ID: {{ process }}</h1>
+            <h1>Host: {{ hostname }}</h1>
+        </div>
+        <div class="message-detail-list">
+            <h2>Messages being processed</h2>
+            <table>
+                <tr>
+                    <th>Message ID</th>
+                    <th>Message created at</th>
+                    <th>Message content</th>
+                </tr>
+                {% for msg in messages_being_processed %}
+                    <tr>
+                        <td>{{ msg.ramp_unique_id }}</td>
+                        <td>{{ msg.init_time }}</td>
+                        <td>{{ msg.content }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <div class="message-detail-list">
+            <h2>Errors</h2>
+            <table>
+                <tr>
+                    <th>Date</th>
+                    <th>Message</th>
+                    <th>Exception</th>
+                </tr>
+                {% for date, process, exception, message in failed_messages %}
+                    <tr>
+                        <td>{{ date }}</td>
+                        <td><pre>{{ message }}</pre></td>
+                        <td><pre>{{ exception }}</pre></td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
 </body>
 </html>
