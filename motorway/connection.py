@@ -61,7 +61,8 @@ class ConnectionIntersection(Intersection):
                 self.queue_processes[queue]['stream_heartbeats'][consumer] = {
                     'heartbeat': current_heartbeat(),
                     'process_name': connection_updates['meta']['name'],
-                    'process_id': connection_updates['meta']['id']
+                    'process_id': connection_updates['meta']['id'],
+                    'report_address': connection_updates['meta'].get('report_address', None),
                 }
                 logger.debug("Received heartbeat from %s on queue %s - current value %s" % (consumer, queue, self.queue_processes[queue]['stream_heartbeats'][consumer]))
         yield

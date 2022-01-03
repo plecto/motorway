@@ -35,7 +35,6 @@ class ControllerIntersection(Intersection):
         self.stream_consumers = stream_consumers or {}
         self.ramp_socks = {}
         self.messages = {}  # Dictionary of all messages which are currently "in flight", eg not successful or failed
-        self.messages_being_processed = {}
         self.failed_messages = {}
         self.process_statistics = {}
         self.queue_processes = {}
@@ -83,11 +82,6 @@ class ControllerIntersection(Intersection):
         """
         now = datetime.datetime.now()
         for message in messages:
-
-            if message.content['msg_type'] in ('started_processing', 'finished_processing'):
-                self._update_messages_being_processed(message)
-                continue
-
             original_process = message.producer_uuid
             if original_process not in self.process_statistics:
                 self.process_statistics[original_process] = self.get_default_process_dict()
@@ -159,25 +153,6 @@ class ControllerIntersection(Intersection):
             pass
         yield  # Hack: This is actually done by self.update() to trigger it even if there are no messages and to reduce messages to 1/s
 
-    def _update_messages_being_processed(self, message):
-        if message.process_name not in self.messages_being_processed:
-            self.messages_being_processed[message.content['process_name']] = []
-
-        if message.content['msg_type'] == 'started_processing':
-            self._update_messages_currently_being_processed(message)
-        elif message.content['msg_type'] == 'finished_processing':
-            self._update_messages_finished_processing(message)
-
-    def _update_messages_currently_being_processed(self, message):
-        self.messages_being_processed[message.content['process_name']].append({
-            'ramp_unique_id': message.ramp_unique_id,
-            'init_time': message.content['init_time'],
-            'content': message.content['message_content']
-        })
-
-    def _update_messages_finished_processing(self, message):
-        self.messages_being_processed[message.content['process_name']] = []
-
     def update(self):
         """
         Goes through all in flight messages, update statistics and forward to web intersection
@@ -217,7 +192,6 @@ class ControllerIntersection(Intersection):
             'process_id_to_name': self.process_id_to_name.copy(),
             'process_statistics': self.process_statistics.copy(),
             'stream_consumers': self.stream_consumers.copy(),
-            'messages_being_processed': self.messages_being_processed.copy(),
             'failed_messages': self.failed_messages.copy(),
         }, grouping_value=str(self.process_uuid))
 

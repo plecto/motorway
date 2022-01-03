@@ -4,6 +4,7 @@ import logging
 import socket
 from threading import Thread
 
+import zmq
 from flask import Flask, render_template, Response
 from isodate import parse_duration
 
@@ -56,7 +57,7 @@ class WebserverIntersection(Intersection):
                 "detail.html",
                 process=process,
                 hostname=socket.gethostname(),
-                messages_being_processed=self.messages_being_processed.get(process, []),
+                messages_being_processed=self._get_messages_being_processed(process),
                 failed_messages=reversed(sorted([msg for msg in self.failed_messages.values() if
                                  msg[1] == process], key=lambda itm: itm[0])[-20:]),
 
@@ -83,10 +84,27 @@ class WebserverIntersection(Intersection):
         ))
         p.start()
 
+    def _get_messages_being_processed(self, process_uuid):
+        report_socket_address = self.process_id_to_report_address.get(process_uuid, None)
+        messages_being_processed = []
+        if report_socket_address:
+            messages_being_processed = self._get_messages_being_processed_from_socket(report_socket_address)
+
+        return messages_being_processed
+
+    def _get_messages_being_processed_from_socket(self, socket_address):
+        context = zmq.Context()
+        report_socket = context.socket(zmq.REQ)
+
+        with report_socket.connect(socket_address) as conn:  # closes connection upon exit
+            report_socket.send_string('')
+            messages_being_processed_raw = report_socket.recv_json()
+
+        return [msg for msg in json.loads(messages_being_processed_raw)]
+
     def process(self, message):
         self.process_statistics = message.content['process_statistics']
         self.stream_consumers = message.content['stream_consumers']
-        self.messages_being_processed = message.content['messages_being_processed']
         self.failed_messages = message.content['failed_messages']
 
         for process_id, stats in self.process_statistics.items():

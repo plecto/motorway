@@ -1,3 +1,4 @@
+import json
 import os
 import random
 from queue import Empty
@@ -46,7 +47,6 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
     """
 
     send_control_messages = True
-    track_processing_message_interval = 5
 
     def __init__(self, process_uuid=None):
         super(Intersection, self).__init__()
@@ -54,13 +54,15 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
         self.process_uuid = process_uuid.hex if process_uuid else uuid.uuid4().hex
         self.process_name = multiprocessing.current_process().name
         self.receive_port = None
+        self.report_address = None
         self.send_socks = {}
         self.send_grouper = None
         self.controller_sock = None
         self.message_batch_start = datetime.datetime.now()  # This is used to time how much time messages take
         self.message_being_processed = None
-        self.process_id_to_name = {}  # Maps UUIDs to human readable names
-        self.process_address_to_uuid = {}  # Maps tcp endpoints to human readable names
+        self.process_id_to_name = {}  # Maps process UUIDs to human readable names
+        self.process_address_to_uuid = {}  # Maps TCP endpoints to human readable names
+        self.process_id_to_report_address = {}  # Maps process UUIDs to TCP endpoints for reporting message processing
         self.grouper_instance = None
 
     def thread_factory(self, input_stream, output_stream=None, refresh_connection_stream=None, grouper_cls=None, process_uuid=None):
@@ -86,11 +88,12 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
         thread_factories_to_run.append(thread_main_factory)
 
         if self.send_control_messages:
-            thread_track_message_being_processed_factory = lambda: Thread(
-                target=self.track_message_being_processed,
-                name="track_message_being_processed",
+            thread_report_message_being_processed_factory = lambda: Thread(
+                target=self.report_message_being_processed,
+                name="report_message_being_processed",
+                kwargs={'context': context}
             )
-            thread_factories_to_run.append(thread_track_message_being_processed_factory)
+            thread_factories_to_run.append(thread_report_message_being_processed_factory)
 
         return thread_factories_to_run
 
@@ -192,57 +195,39 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
         while True:
             self._process(receive_sock, controller_sock=self.controller_sock)
 
-    def track_message_being_processed(self):
+    def report_message_being_processed(self, context=None):
+        socket = context.socket(zmq.REP)
+        self.report_address = socket.bind_to_random_port('tcp://*')
         self._wait_for_controller_sock()
 
         while True:
-            if self.message_being_processed:
-                self._broadcast_message_being_processed(self.message_being_processed)
+            _ = socket.recv()  # wait for request from WebserverIntersection
+
+            message_being_processed = self.message_being_processed
+            if message_being_processed:
+                msgs_being_processed = self._format_message_being_processed(message_being_processed)
             else:
-                self._broadcast_finished_processing()
+                msgs_being_processed = []
 
-            time.sleep(self.track_processing_message_interval)
+            socket.send_json(json.dumps(msgs_being_processed))
 
-    def _broadcast_message_being_processed(self, message):
-        if isinstance(message, list):
-            self._broadcast_multiple_messages_being_processed(message)
+    def _format_message_being_processed(self, message_being_processed):
+        msgs_formatted = []
+        if isinstance(message_being_processed, list):
+            for msg in message_being_processed:
+                msgs_formatted.append({
+                    'ramp_unique_id': msg.ramp_unique_id,
+                    'content': msg.content,
+                    'init_time': msg.init_time.isoformat(),
+                })
         else:
-            self._broadcast_single_message_being_processed(message)
-
-    def _broadcast_multiple_messages_being_processed(self, message_list):
-        for message in message_list:
-            self.controller_sock.send_json({
-                'ramp_unique_id': message.ramp_unique_id,
-                'process_name': self.process_uuid,
-                'content': {
-                    'msg_type': 'started_processing',
-                    'process_name': self.process_uuid,
-                    'message_content': message.content,
-                    'init_time': message.init_time.isoformat(),
-                }
+            msgs_formatted.append({
+                'ramp_unique_id': message_being_processed.ramp_unique_id,
+                'content': message_being_processed.content,
+                'init_time': message_being_processed.init_time.isoformat(),
             })
 
-    def _broadcast_single_message_being_processed(self, message):
-        self.controller_sock.send_json({
-            'ramp_unique_id': message.ramp_unique_id,
-            'process_name': self.process_uuid,
-            'content': {
-                'msg_type': 'started_processing',
-                'process_name': self.process_uuid,
-                'message_content': message.content,
-                'init_time': message.init_time.isoformat(),
-            }
-        })
-
-    def _broadcast_finished_processing(self):
-        self.controller_sock.send_json({
-            'ramp_unique_id': str(uuid.uuid4()),
-            'process_name': self.process_uuid,
-            'content': {
-                'msg_type': 'finished_processing',
-                'process_name': self.process_uuid,
-            }
-        })
+        return msgs_formatted
 
     def _wait_for_controller_sock(self):
         while not self.controller_sock:
