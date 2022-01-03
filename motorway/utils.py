@@ -1,9 +1,11 @@
 import decimal
+from contextlib import contextmanager
 from json import JSONEncoder
 import datetime
+import socket
+
 from isodate import duration_isoformat, datetime_isoformat
 import zmq
-import socket
 
 ramp_result_stream_name = lambda ramp_class_name: "_ramp_result_%s" % ramp_class_name
 
@@ -94,3 +96,13 @@ def get_ip():
     finally:
         s.close()
     return ip
+
+
+@contextmanager
+def message_processing_manager(intersection, message):
+    if intersection.send_control_messages:
+        intersection.message_being_processed = message
+        yield
+        intersection.message_being_processed = None
+    else:
+        yield

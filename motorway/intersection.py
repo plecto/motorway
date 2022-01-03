@@ -14,7 +14,7 @@ from motorway.instrumentation import instrumentation_manager
 from motorway.messages import Message
 from motorway.mixins import GrouperMixin, SendMessageMixin, ConnectionMixin
 from motorway.threads import ThreadRunner
-from motorway.utils import set_timeouts_on_socket
+from motorway.utils import set_timeouts_on_socket, message_processing_manager
 import zmq
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,7 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
     """
 
     send_control_messages = True
+    track_processing_message_interval = 5
 
     def __init__(self, process_uuid=None):
         super(Intersection, self).__init__()
@@ -57,12 +58,14 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
         self.send_grouper = None
         self.controller_sock = None
         self.message_batch_start = datetime.datetime.now()  # This is used to time how much time messages take
+        self.message_being_processed = None
         self.process_id_to_name = {}  # Maps UUIDs to human readable names
         self.process_address_to_uuid = {}  # Maps tcp endpoints to human readable names
         self.grouper_instance = None
 
     def thread_factory(self, input_stream, output_stream=None, refresh_connection_stream=None, grouper_cls=None, process_uuid=None):
         context = zmq.Context()
+        thread_factories_to_run = []
 
         # Create Thread Factories :-)
 
@@ -73,14 +76,23 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
             'output_queue': output_stream,
             'grouper_cls': grouper_cls
         })
+        thread_factories_to_run.append(thread_update_connections_factory)
 
         thread_main_factory = lambda: Thread(target=self.receive_messages, name="message_producer", kwargs={
             'context': context,
             'output_stream': output_stream,
             'grouper_cls': grouper_cls,
         })
+        thread_factories_to_run.append(thread_main_factory)
 
-        return [thread_update_connections_factory, thread_main_factory]
+        if self.send_control_messages:
+            thread_track_message_being_processed_factory = lambda: Thread(
+                target=self.track_message_being_processed,
+                name="track_message_being_processed",
+            )
+            thread_factories_to_run.append(thread_track_message_being_processed_factory)
+
+        return thread_factories_to_run
 
     def _process(self, receive_sock, controller_sock=None):
         try:
@@ -112,10 +124,11 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
                 try:
                     self.message_batch_start = datetime.datetime.now()
 
-                    for generated_message in self.process_instrumented(message):
-                        if generated_message is not None and self.send_socks:
-                            self.send_message(generated_message, self.process_uuid, time_consumed=(datetime.datetime.now() - self.message_batch_start), control_message=self.send_control_messages)
-                            self.message_batch_start = datetime.datetime.now()
+                    with message_processing_manager(self, message):
+                        for generated_message in self.process_instrumented(message):
+                            if generated_message is not None and self.send_socks:
+                                self.send_message(generated_message, self.process_uuid, time_consumed=(datetime.datetime.now() - self.message_batch_start), control_message=self.send_control_messages)
+                                self.message_batch_start = datetime.datetime.now()
                 except Exception as e:
                     logger.error(str(e), exc_info=True)
 
@@ -174,8 +187,63 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
         set_timeouts_on_socket(receive_sock)
 
         if self.send_control_messages:
-            while not self.controller_sock:
-                time.sleep(1)
+            self._wait_for_controller_sock()
 
         while True:
             self._process(receive_sock, controller_sock=self.controller_sock)
+
+    def track_message_being_processed(self):
+        self._wait_for_controller_sock()
+
+        while True:
+            if self.message_being_processed:
+                self._broadcast_message_being_processed(self.message_being_processed)
+            else:
+                self._broadcast_finished_processing()
+
+            time.sleep(self.track_processing_message_interval)
+
+    def _broadcast_message_being_processed(self, message):
+        if isinstance(message, list):
+            self._broadcast_multiple_messages_being_processed(message)
+        else:
+            self._broadcast_single_message_being_processed(message)
+
+    def _broadcast_multiple_messages_being_processed(self, message_list):
+        for message in message_list:
+            self.controller_sock.send_json({
+                'ramp_unique_id': message.ramp_unique_id,
+                'process_name': self.process_uuid,
+                'content': {
+                    'msg_type': 'started_processing',
+                    'process_name': self.process_uuid,
+                    'message_content': message.content,
+                    'init_time': message.init_time.isoformat(),
+                }
+            })
+
+    def _broadcast_single_message_being_processed(self, message):
+        self.controller_sock.send_json({
+            'ramp_unique_id': message.ramp_unique_id,
+            'process_name': self.process_uuid,
+            'content': {
+                'msg_type': 'started_processing',
+                'process_name': self.process_uuid,
+                'message_content': message.content,
+                'init_time': message.init_time.isoformat(),
+            }
+        })
+
+    def _broadcast_finished_processing(self):
+        self.controller_sock.send_json({
+            'ramp_unique_id': str(uuid.uuid4()),
+            'process_name': self.process_uuid,
+            'content': {
+                'msg_type': 'finished_processing',
+                'process_name': self.process_uuid,
+            }
+        })
+
+    def _wait_for_controller_sock(self):
+        while not self.controller_sock:
+            time.sleep(1)

@@ -1,9 +1,12 @@
 import datetime
 import json
 import logging
+import socket
 from threading import Thread
+
 from flask import Flask, render_template, Response
 from isodate import parse_duration
+
 from motorway.intersection import Intersection
 from motorway.utils import DateTimeAwareJsonEncoder
 
@@ -29,6 +32,7 @@ class WebserverIntersection(Intersection):
 
         self.process_statistics = {}
         self.stream_consumers = {}
+        self.messages_being_processed = {}
         self.failed_messages = {}
         self.groups = {}
 
@@ -51,6 +55,8 @@ class WebserverIntersection(Intersection):
             return render_template(
                 "detail.html",
                 process=process,
+                hostname=socket.gethostname(),
+                messages_being_processed=self.messages_being_processed.get(process, []),
                 failed_messages=reversed(sorted([msg for msg in self.failed_messages.values() if
                                  msg[1] == process], key=lambda itm: itm[0])[-20:]),
 
@@ -80,6 +86,7 @@ class WebserverIntersection(Intersection):
     def process(self, message):
         self.process_statistics = message.content['process_statistics']
         self.stream_consumers = message.content['stream_consumers']
+        self.messages_being_processed = message.content['messages_being_processed']
         self.failed_messages = message.content['failed_messages']
 
         for process_id, stats in self.process_statistics.items():
