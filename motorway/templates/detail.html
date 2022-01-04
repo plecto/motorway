@@ -14,6 +14,10 @@
         <div class="message-detail-header">
             <h1>Process ID: {{ process }}</h1>
             <h1>Host: {{ hostname }}</h1>
+            <h2>Process state: {{ process_stats.state }}</h2>
+            <h2>Success messages: {{ process_stats.success }}</h2>
+            <h2>Waiting messages: {{ process_stats.waiting }}</h2>
+            <h2>Failed messages: {{ process_stats.failed }}</h2>
         </div>
         <div class="message-detail-list">
             <h2>Messages being processed</h2>

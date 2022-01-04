@@ -57,6 +57,7 @@ class WebserverIntersection(Intersection):
                 process=process,
                 hostname=socket.gethostname(),
                 messages_being_processed=self._get_messages_being_processed_for_process(process),
+                process_stats=self.process_statistics.get(process),
                 failed_messages=reversed(sorted([msg for msg in self.failed_messages.values() if
                                  msg[1] == process], key=lambda itm: itm[0])[-20:]),
 
