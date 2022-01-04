@@ -96,9 +96,9 @@ class WebserverIntersection(Intersection):
         context = zmq.Context()
         report_socket = context.socket(zmq.REQ)
 
-        with report_socket.connect(socket_address) as conn:  # closes connection upon exit
-            conn.send_string('')
-            messages_being_processed_json = conn.recv_json()
+        report_socket.connect(socket_address)
+        report_socket.send_string('')
+        messages_being_processed_json = report_socket.recv_json()
 
         return [msg for msg in json.loads(messages_being_processed_json)]
 
