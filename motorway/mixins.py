@@ -121,6 +121,7 @@ class ConnectionMixin(object):
         # Register as consumer of input stream
         update_connection_sock = context.socket(zmq.PUSH)
         update_connection_sock.connect(connections['_update_connections']['streams'][0])
+        report_address = 'tcp://%s:%s' % (get_ip(), self.report_address) if hasattr(self, 'report_address') else None
         intersection_connection_info = {
             'streams': {
                 input_queue: ['tcp://%s:%s' % (get_ip(), self.receive_port)]
@@ -128,7 +129,8 @@ class ConnectionMixin(object):
             'meta': {
                 'id': self.process_uuid,
                 'name': self.process_name,
-                'grouping': None if not grouper_cls else grouper_cls.__name__  # Specify how messages sent to this intersection should be grouped
+                'grouping': None if not grouper_cls else grouper_cls.__name__,  # Specify how messages sent to this intersection should be grouped
+                'report_address': report_address,
             }
         }
         Message(None, intersection_connection_info).send(update_connection_sock, producer_uuid=self.process_uuid)
@@ -145,6 +147,7 @@ class ConnectionMixin(object):
                 if output_queue in connections:
                     self.set_send_socks(connections, output_queue, context)
                 self.process_id_to_name = {process['process_id']: process['process_name'] for process in itertools.chain.from_iterable([queue_details['stream_heartbeats'].values() for queue_details in connections.values()])}
+                self.process_id_to_report_address = {process['process_id']: process['report_address'] for process in itertools.chain.from_iterable([queue_details['stream_heartbeats'].values() for queue_details in connections.values()])}
                 self.process_address_to_uuid = {address: process['process_id'] for address, process in itertools.chain.from_iterable([queue_details['stream_heartbeats'].items() for queue_details in connections.values()])}
             except zmq.Again:
                 time.sleep(1)

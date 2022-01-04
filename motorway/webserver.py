@@ -1,9 +1,13 @@
 import datetime
 import json
 import logging
+import socket
 from threading import Thread
+
+import zmq
 from flask import Flask, render_template, Response
 from isodate import parse_duration
+
 from motorway.intersection import Intersection
 from motorway.utils import DateTimeAwareJsonEncoder
 
@@ -51,6 +55,9 @@ class WebserverIntersection(Intersection):
             return render_template(
                 "detail.html",
                 process=process,
+                hostname=socket.gethostname(),
+                messages_being_processed=self._get_messages_being_processed_for_process(process),
+                process_stats=self.process_statistics.get(process),
                 failed_messages=reversed(sorted([msg for msg in self.failed_messages.values() if
                                  msg[1] == process], key=lambda itm: itm[0])[-20:]),
 
@@ -76,6 +83,24 @@ class WebserverIntersection(Intersection):
             host="0.0.0.0",
         ))
         p.start()
+
+    def _get_messages_being_processed_for_process(self, process_uuid):
+        report_socket_address = self.process_id_to_report_address.get(process_uuid)
+        messages_being_processed = []
+        if report_socket_address:
+            messages_being_processed = self._get_messages_being_processed_from_socket(report_socket_address)
+
+        return messages_being_processed
+
+    def _get_messages_being_processed_from_socket(self, socket_address):
+        context = zmq.Context()
+        report_socket = context.socket(zmq.REQ)
+
+        report_socket.connect(socket_address)
+        report_socket.send_string('')
+        messages_being_processed_json = report_socket.recv_json()
+
+        return [msg for msg in json.loads(messages_being_processed_json)]
 
     def process(self, message):
         self.process_statistics = message.content['process_statistics']
