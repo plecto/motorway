@@ -33,7 +33,6 @@ class WebserverIntersection(Intersection):
 
         self.process_statistics = {}
         self.stream_consumers = {}
-        self.messages_being_processed = {}
         self.failed_messages = {}
         self.groups = {}
 
@@ -57,7 +56,7 @@ class WebserverIntersection(Intersection):
                 "detail.html",
                 process=process,
                 hostname=socket.gethostname(),
-                messages_being_processed=self._get_messages_being_processed(process),
+                messages_being_processed=self._get_messages_being_processed_for_process(process),
                 failed_messages=reversed(sorted([msg for msg in self.failed_messages.values() if
                                  msg[1] == process], key=lambda itm: itm[0])[-20:]),
 
@@ -84,8 +83,8 @@ class WebserverIntersection(Intersection):
         ))
         p.start()
 
-    def _get_messages_being_processed(self, process_uuid):
-        report_socket_address = self.process_id_to_report_address.get(process_uuid, None)
+    def _get_messages_being_processed_for_process(self, process_uuid):
+        report_socket_address = self.process_id_to_report_address.get(process_uuid)
         messages_being_processed = []
         if report_socket_address:
             messages_being_processed = self._get_messages_being_processed_from_socket(report_socket_address)
@@ -97,10 +96,10 @@ class WebserverIntersection(Intersection):
         report_socket = context.socket(zmq.REQ)
 
         with report_socket.connect(socket_address) as conn:  # closes connection upon exit
-            report_socket.send_string('')
-            messages_being_processed_raw = report_socket.recv_json()
+            conn.send_string('')
+            messages_being_processed_json = conn.recv_json()
 
-        return [msg for msg in json.loads(messages_being_processed_raw)]
+        return [msg for msg in json.loads(messages_being_processed_json)]
 
     def process(self, message):
         self.process_statistics = message.content['process_statistics']

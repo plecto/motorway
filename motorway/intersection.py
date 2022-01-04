@@ -198,7 +198,6 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
     def report_message_being_processed(self, context=None):
         socket = context.socket(zmq.REP)
         self.report_address = socket.bind_to_random_port('tcp://*')
-        self._wait_for_controller_sock()
 
         while True:
             _ = socket.recv()  # wait for request from WebserverIntersection
@@ -211,7 +210,8 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
 
             socket.send_json(json.dumps(msgs_being_processed))
 
-    def _format_message_being_processed(self, message_being_processed):
+    @staticmethod
+    def _format_message_being_processed(message_being_processed):
         msgs_formatted = []
         if isinstance(message_being_processed, list):
             for msg in message_being_processed:
