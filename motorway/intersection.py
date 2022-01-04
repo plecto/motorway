@@ -219,12 +219,14 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
                     'ramp_unique_id': msg.ramp_unique_id,
                     'content': msg.content,
                     'init_time': msg.init_time.isoformat(),
+                    'grouping_value': msg.grouping_value,
                 })
         else:
             msgs_formatted.append({
                 'ramp_unique_id': message_being_processed.ramp_unique_id,
                 'content': message_being_processed.content,
                 'init_time': message_being_processed.init_time.isoformat(),
+                'grouping_value': message_being_processed.grouping_value,
             })
 
         return msgs_formatted

@@ -19,14 +19,16 @@
             <h2>Messages being processed</h2>
             <table>
                 <tr>
-                    <th>Message ID</th>
-                    <th>Message created at</th>
-                    <th>Message content</th>
+                    <th>ID</th>
+                    <th>Created at</th>
+                    <th>Grouping value</th>
+                    <th>Content</th>
                 </tr>
                 {% for msg in messages_being_processed %}
                     <tr>
                         <td>{{ msg.ramp_unique_id }}</td>
                         <td>{{ msg.init_time }}</td>
+                        <td>{{ msg.grouping_value }}</td>
                         <td>{{ msg.content }}</td>
                     </tr>
                 {% endfor %}
