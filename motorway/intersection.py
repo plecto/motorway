@@ -200,37 +200,32 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
         self.report_address = socket.bind_to_random_port('tcp://*')
 
         while True:
-            _ = socket.recv()  # wait for request from WebserverIntersection
+            socket.recv()  # wait for request from WebserverIntersection
 
-            message_being_processed = self.message_being_processed
+            message_being_processed = self.message_being_processed or []
             if message_being_processed:
-                msgs_being_processed = self._format_message_being_processed(message_being_processed)
-            else:
-                msgs_being_processed = []
+                message_being_processed = self._format_message_being_processed(message_being_processed)
 
-            socket.send_json(json.dumps(msgs_being_processed))
+            socket.send_json(json.dumps(message_being_processed))
 
     @staticmethod
     def _format_message_being_processed(message_being_processed):
         msgs_formatted = []
-        if isinstance(message_being_processed, list):
-            for msg in message_being_processed:
-                msgs_formatted.append({
-                    'ramp_unique_id': msg.ramp_unique_id,
-                    'content': msg.content,
-                    'init_time': msg.init_time.isoformat(),
-                    'grouping_value': msg.grouping_value,
-                })
-        else:
+
+        if not isinstance(message_being_processed, list):
+            message_being_processed = [message_being_processed]
+
+        for msg in message_being_processed:
             msgs_formatted.append({
-                'ramp_unique_id': message_being_processed.ramp_unique_id,
-                'content': message_being_processed.content,
-                'init_time': message_being_processed.init_time.isoformat(),
-                'grouping_value': message_being_processed.grouping_value,
+                'ramp_unique_id': msg.ramp_unique_id,
+                'content': msg.content,
+                'init_time': msg.init_time.isoformat(),
+                'grouping_value': msg.grouping_value,
             })
 
         return msgs_formatted
 
     def _wait_for_controller_sock(self):
         while not self.controller_sock:
+            logger.debug('Waiting for controller socket')
             time.sleep(1)
