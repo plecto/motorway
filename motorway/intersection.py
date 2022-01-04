@@ -203,10 +203,9 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
             socket.recv()  # wait for request from WebserverIntersection
 
             message_being_processed = self.message_being_processed or []
-            if message_being_processed:
-                message_being_processed = self._format_message_being_processed(message_being_processed)
+            formatted_message_being_processed = self._format_message_being_processed(message_being_processed)
 
-            socket.send_json(json.dumps(message_being_processed))
+            socket.send_json(json.dumps(formatted_message_being_processed))
 
     @staticmethod
     def _format_message_being_processed(message_being_processed):
