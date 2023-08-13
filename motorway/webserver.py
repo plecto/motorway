@@ -128,7 +128,7 @@ class WebserverIntersection(Intersection):
             group['waiting'] = sum([process['waiting'] for process in group['processes'].values()])
             group['time_taken'] = datetime.timedelta()
             group['histogram'] = {str(minute): {'error_count': 0, 'success_count': 0, 'timeout_count': 0, 'processed_count': 0}.copy() for minute in range(0, 60)}.copy()
-            for process_id, process in group['processes'].items():
+            for process_id, process in list(group['processes'].items()):
 
                 # Remove stale processes (those no longer in the connection thread)
                 if process_id not in self.process_id_to_name:
