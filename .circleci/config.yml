@@ -6,10 +6,6 @@ jobs:
 
     steps:
       - checkout
-      # Download and cache python dependencies
-      - restore_cache:
-          keys:
-          - v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
 
       - run:
           name: install dependencies
@@ -18,12 +14,7 @@ jobs:
             source venv/bin/activate
             pip install -r requirements-dev.txt
             python setup.py install
-
-      - save_cache:
-          paths:
-            - ./venv
-          key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
-
+            
       - run:
           name: execute nose test
           command: |
