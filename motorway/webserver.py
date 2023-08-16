@@ -18,7 +18,7 @@ class WebserverIntersection(Intersection):
     """
     Simple Flask webserver that exposes information sent from the controller(s).
 
-    It groups processes by name and furhter more sets a "status" for the different processes, based on
+    It groups processes by name and further more sets a "status" for the different processes, based on
     how busy they are.
     """
 

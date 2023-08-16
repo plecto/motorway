@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-      - image: circleci/python:3.8.6-buster
+      - image: cimg/python:3.11.4
 
     steps:
       - checkout
@@ -25,10 +25,14 @@ jobs:
           key: v1-dependencies-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
 
       - run:
-          name: execute nose test
+          name: run tests
           command: |
             source venv/bin/activate
-            nosetests
+            mkdir test-reports
+            pytest --junitxml=test-reports/junit.xml
+
+      - store_test_results:
+          path: test-reports
 
 workflows:
   version: 2

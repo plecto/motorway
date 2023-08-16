@@ -5,3 +5,6 @@ boto3
 simple-salesforce
 recurly
 sqlalchemy
+pytest
+freezegun
+mock
