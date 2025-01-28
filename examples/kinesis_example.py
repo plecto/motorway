@@ -3,6 +3,7 @@ from motorway.grouping import HashRingGrouper
 from motorway.pipeline import Pipeline
 from examples.ramps import WordRamp, ExampleSQSRamp, ExampleKinesisIntersection, ExampleKinesisRamp
 from examples.intersections import SentenceSplitIntersection, WordCountIntersection, AggregateIntersection
+import logging
 import logging.config
 
 logging.config.dictConfig({

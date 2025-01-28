@@ -1,8 +1,10 @@
+import os
 import time
 import uuid
 from motorway.contrib.amazon_kinesis.ramps import KinesisRamp
 from motorway.contrib.amazon_kinesis.intersections import KinesisInsertIntersection
 from motorway.contrib.amazon_sqs.ramps import SQSRamp
+from motorway.contrib.redpanda.ramps import RedpandaRamp
 from motorway.messages import Message
 from motorway.ramp import Ramp
 import random
@@ -49,8 +51,7 @@ class WordRamp(Ramp):
 
 
 class ExampleSQSRamp(SQSRamp):
-    queue_name = "tutorial_motorway"
-
+    queue_name =  os.getenv('SQS_QUEUE_NAME')
 
 class ExampleKinesisRamp(KinesisRamp):
     stream_name = "data-pipeline-test"
@@ -58,3 +59,7 @@ class ExampleKinesisRamp(KinesisRamp):
 
 class ExampleKinesisIntersection(KinesisInsertIntersection):
     stream_name = "data-pipeline-test"
+
+class ExampleRedPandaRamp(RedpandaRamp):
+    group_id = "test"
+    topic_name = "tutorial_motorway"

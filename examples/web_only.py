@@ -1,3 +1,4 @@
+import logging
 import logging.config
 from motorway.pipeline import Pipeline
 

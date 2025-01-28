@@ -1,3 +1,4 @@
+import os
 from botocore.exceptions import ClientError
 
 
@@ -27,9 +28,14 @@ class SQSMixin(object):
 
     def connection_parameters(self):
         return {
-            'region_name': 'eu-west-1',
-            'service_name': 'sqs'
+            #'region_name': 'eu-west-1',
+            #'service_name': 'sqs'
             # Add this or use ENV VARS
             # 'aws_access_key_id': '',
             # 'aws_secret_access_key': ''
+            'service_name': os.getenv('SERVICE_NAME','sqs'),
+            'region_name': os.getenv('REGION_NAME','eu-west-1'),
+            'aws_access_key_id': os.getenv('AWS_ACCESS_KEY_ID'),
+            'aws_secret_access_key': os.getenv('AWS_SECRET_ACCESS_KEY'),
+            'endpoint_url': os.getenv('ENDPOINT_URL')
         }
