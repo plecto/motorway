@@ -10,11 +10,24 @@ class SQSMixin(object):
 
     def get_queue_from_aws(self):
         try:
-            return self.sqs.get_queue_by_name(QueueName=self.queue_name)
+            print(f"[DEBUG] Attempting to retrieve queue: {self.queue_name}")
+            queue = self.sqs.get_queue_by_name(QueueName=self.queue_name)
+            print(f"[DEBUG] Successfully retrieved queue URL: {queue.url}")
+            return queue
         except ClientError as client_error:
-            # The queue doesn't exist and should be created
-            if client_error.response['Error']['Code'] == 'AWS.SimpleQueueService.NonExistentQueue':
-                return self.sqs.create_queue(QueueName=self.queue_name)
+            error_code = client_error.response.get('Error', {}).get('Code', '')
+            print(f"[ERROR] ClientError while getting queue '{self.queue_name}': {error_code}")
+
+            # Handle non-existent queue error
+            if error_code == 'AWS.SimpleQueueService.NonExistentQueue':
+                print(f"[DEBUG] Queue '{self.queue_name}' does not exist. Attempting to create it...")
+                try:
+                    queue = self.sqs.create_queue(QueueName=self.queue_name)
+                    print(f"[DEBUG] Successfully created queue: {queue.url}")
+                    return queue
+                except ClientError as creation_error:
+                    print(f"[ERROR] Failed to create queue '{self.queue_name}': {str(creation_error)}")
+                    raise creation_error
             else:
                 raise client_error
 
