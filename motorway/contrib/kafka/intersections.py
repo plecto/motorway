@@ -1,30 +1,33 @@
 import json
+from json import JSONDecodeError
+
 from confluent_kafka import Producer
+
+from motorway.contrib.kafka.mixins import KafkaMixin
 from motorway.decorators import batch_process
 from motorway.intersection import Intersection
 from time import sleep
 import logging
-from motorway.contrib.redpanda.mixins import RedPandaMixin
 
 
 logger = logging.getLogger(__name__)
 
 
-class RedpandaInsertIntersection(Intersection, RedPandaMixin):
+class KafkaInsertIntersection(Intersection, KafkaMixin):
     topic_name = None
 
     def __init__(self, **kwargs):
-        super(RedpandaInsertIntersection, self).__init__(**kwargs)
-        assert self.topic_name, "Please define the attribute 'topic_name' on your RedpandaInsertIntersection"
+        super().__init__(**kwargs)
+        assert self.topic_name, "Please define the attribute 'topic_name' on your KafkaInsertIntersection"
         self.producer = self.create_producer()
 
     def create_producer(self):
         """
-        Create and configure a Kafka producer for Redpanda.
-        Modify the bootstrap.servers with your Redpanda cluster endpoints.
+        Create and configure a Kafka producer for Kafka.
+        Modify the bootstrap.servers with your Kafka cluster endpoints.
         """
         return Producer({
-            'bootstrap.servers': 'redpanda:9092',  # Replace with your Redpanda cluster endpoint
+            **self.connection_parameters(),
             'queue.buffering.max.messages': 100000,  # Adjust to your needs
             'message.max.bytes': 1024 * 1024,  # Default is 1 MB, ensure it matches your cluster config
             'enable.idempotence': True  # Ensure delivery exactly once
@@ -33,19 +36,20 @@ class RedpandaInsertIntersection(Intersection, RedPandaMixin):
     @batch_process(limit=500, wait=1)
     def process(self, messages):
         """
-        Process messages in batches for Redpanda.
-        Each batch can contain up to 500 records, but Redpanda allows larger limits per partition.
+        Process messages in batches for Kafka.
+        Each batch can contain up to 500 records, but Kafka allows larger limits per partition.
         The function retries failed deliveries and logs errors for further inspection.
         """
         records = []
         for message in messages:
             try:
-                key = message.grouping_value.encode('utf-8')
                 value = json.dumps(message.content).encode('utf-8')
-                records.append({'key': key, 'value': value, 'message': message})
-            except Exception as e:
+            except TypeError as e:
                 logger.error(f"Failed to serialize message: {message}. Error: {e}")
                 self.fail(message)
+            else:
+                key = message.grouping_value.encode('utf-8')
+                records.append({'key': key, 'value': value, 'message': message})
 
         while records:
             for record in records:
@@ -54,14 +58,14 @@ class RedpandaInsertIntersection(Intersection, RedPandaMixin):
                         topic=self.topic_name,
                         key=record['key'],
                         value=record['value'],
-                        callback=lambda err, msg, r=record: self._delivery_callback(err, msg, r)
+                        callback=lambda err, msg, r=record: self._delivery_callback(err, msg, r),
                     )
                 except BufferError:
                     logger.warning("Producer buffer is full, retrying...")
                     sleep(1)
                     continue
 
-            # Poll to ensure delivery
+            # flush to ensure delivery
             self.producer.flush()
             records = [r for r in records if 'ack' not in r]
 
@@ -82,3 +86,4 @@ class RedpandaInsertIntersection(Intersection, RedPandaMixin):
         else:
             logger.debug(f"Message delivered to {msg.topic()} [{msg.partition()}] @ offset {msg.offset()}")
             self.ack(record['message'])
+            record['ack'] = True

@@ -1,9 +1,8 @@
-import logging
 import logging.config
 
 from motorway.pipeline import Pipeline
-from examples.ramps import WordRamp, ExampleRedPandaRamp
-from examples.intersections import SentenceSplitIntersection, WordCountIntersection, ExampleREDPandaIntersection
+from examples.ramps import WordRamp, ExampleKafkaRamp
+from examples.intersections import SentenceSplitIntersection, WordCountIntersection, ExampleKafkaIntersection
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -47,11 +46,11 @@ class WordCountPipeline(Pipeline):
 
     def definition(self):
         self.add_ramp(WordRamp, 'sentence')
-        self.add_intersection(SentenceSplitIntersection, 'sentence', 'word_to_redpanda')
-        self.add_intersection(ExampleREDPandaIntersection, 'word_to_redpanda')
+        self.add_intersection(SentenceSplitIntersection, 'sentence', 'word_to_kafka')
+        self.add_intersection(ExampleKafkaIntersection, 'word_to_kafka')
 
-        # self.add_ramp(ExampleRedPandaRamp, 'word_from_redpanda')
-        # self.add_intersection(WordCountIntersection, 'word_from_redpanda')
+        # self.add_ramp(ExampleRedPandaRamp, 'word_from_kafka')
+        # self.add_intersection(WordCountIntersection, 'word_from_kafka')
 
 
 if __name__ == '__main__':

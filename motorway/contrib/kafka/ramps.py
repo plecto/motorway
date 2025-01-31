@@ -1,22 +1,22 @@
-import json
 import logging
 import threading
 from queue import Queue
+
+from motorway.contrib.kafka.mixins import KafkaMixin
 from motorway.messages import Message
 from motorway.ramp import Ramp
-from motorway.contrib.redpanda.mixins import RedPandaMixin
 
 logger = logging.getLogger(__name__)
 
-class RedpandaRamp(Ramp, RedPandaMixin):
+class KafkaRamp(Ramp, KafkaMixin):
     topic_name = None
     group_id = None
     MAX_UNCOMPLETED_ITEMS = 3000
 
     def __init__(self, brokers, *args, **kwargs):
-        super(RedpandaRamp, self).__init__(*args, **kwargs)
-        assert self.topic_name, "Please define the attribute `topic_name` for your RedpandaRamp"
-        assert self.group_id, "Please define the attribute `group_id` for your RedpandaRamp"
+        super().__init__(*args, **kwargs)
+        assert self.topic_name, "Please define the attribute `topic_name` for your KafkaRamp"
+        assert self.group_id, "Please define the attribute `group_id` for your KafkaRamp"
 
         self.brokers = brokers
         self.insertion_queue = Queue()
@@ -40,7 +40,7 @@ class RedpandaRamp(Ramp, RedPandaMixin):
 
     def _consume_messages(self):
         """
-        Consume messages from the Redpanda topic and enqueue them.
+        Consume messages from the Kafka topic and enqueue them.
         """
         for message in self.consume_messages(group_id=self.group_id):
             try:
@@ -96,6 +96,6 @@ class RedpandaRamp(Ramp, RedPandaMixin):
         """
         Cleanup on shutdown.
         """
-        logger.info("Shutting down RedpandaRamp")
+        logger.info("Shutting down KafkaRamp")
         self.consumer.close()
         self.producer.flush()

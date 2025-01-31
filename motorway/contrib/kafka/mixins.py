@@ -3,7 +3,7 @@ from kafka.errors import KafkaError
 import json
 
 
-class RedPandaMixin(object):
+class KafkaMixin:
     def init_topic(self):
         assert self.topic_name, "Please define attribute 'topic_name' on your class"
         # Optionally validate or create the topic (this may require external tooling like `rpk` or admin API)
@@ -48,9 +48,8 @@ class RedPandaMixin(object):
 
     def connection_parameters(self):
         """
-        Connection parameters for Redpanda.
-        Replace <username> and <password> with actual credentials.
+        Connection parameters for Kafka.
         """
         return {
-            'bootstrap_servers': 'redpanda:9092'
+            'bootstrap.servers': 'redpanda:9092'
         }
