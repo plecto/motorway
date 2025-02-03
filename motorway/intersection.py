@@ -150,7 +150,7 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
             for generated_message in self.process(message):
                 yield generated_message
 
-    def ack(self, message, retries=100):
+    def ack(self, message: Message, retries=100):
         for index in range(0, retries):
             try:
                 message.ack(time_consumed=(datetime.datetime.now() - self.message_batch_start))
@@ -162,10 +162,10 @@ class Intersection(GrouperMixin, SendMessageMixin, ConnectionMixin, ThreadRunner
 
         self.message_batch_start = datetime.datetime.now()
 
-    def fail(self, message, **kwargs):
+    def fail(self, message: Message, **kwargs):
         message.fail(**kwargs)
 
-    def process(self, message):
+    def process(self, message: Message):
         """
         This function is called continuously by the intersection.
 

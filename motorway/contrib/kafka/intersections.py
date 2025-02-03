@@ -1,5 +1,4 @@
 import json
-from json import JSONDecodeError
 
 from confluent_kafka import Producer
 
@@ -66,6 +65,7 @@ class KafkaInsertIntersection(Intersection, KafkaMixin):
                     continue
 
             # flush to ensure delivery
+            # self.producer.poll(10000)  # TODO: is this needed?
             self.producer.flush()
             records = [r for r in records if 'ack' not in r]
 

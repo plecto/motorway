@@ -44,7 +44,7 @@ class KafkaMixin:
         """
         Decode the message from JSON.
         """
-        return json.loads(message)
+        return json.loads(message.decode('utf-8'))
 
     def connection_parameters(self):
         """

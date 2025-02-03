@@ -2,6 +2,10 @@ import logging
 import threading
 from queue import Queue
 
+import boto3
+from confluent_kafka import Consumer
+from confluent_kafka import Message as KafkaMessage
+
 from motorway.contrib.kafka.mixins import KafkaMixin
 from motorway.messages import Message
 from motorway.ramp import Ramp
@@ -10,92 +14,94 @@ logger = logging.getLogger(__name__)
 
 class KafkaRamp(Ramp, KafkaMixin):
     topic_name = None
-    group_id = None
+    heartbeat_timeout = 30  # Wait 10 seconds for a heartbeat update, or kill it
     MAX_UNCOMPLETED_ITEMS = 3000
+    GET_RECORDS_LIMIT = 1000
 
-    def __init__(self, brokers, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert self.topic_name, "Please define the attribute `topic_name` for your KafkaRamp"
-        assert self.group_id, "Please define the attribute `group_id` for your KafkaRamp"
 
-        self.brokers = brokers
         self.insertion_queue = Queue()
         self.uncompleted_ids = set()
-        self.init_topic()
 
-        # Start thread for consuming messages
-        consume_thread = threading.Thread(target=self._consume_messages, daemon=True)
-        consume_thread.start()
+        self.consumer = Consumer({
+            **self.connection_parameters(),
+        })
+        t = threading.Thread(target=self.consume, name="%s-%s" % (self.__class__.__name__, 'consume'))
+        t.start()
+        # try:
+        #     self.consume()
+        # except Exception as e:
+        #     logger.exception(e)
+        #     print('Closing consumer...')
+        #     self.consumer.close()
+
+    def consume(self):
+        # TODO: do we need to worry about this?
+        # if the shard was claimed by another worker, break out of the loop
+        #if not control_record['worker_id'] == self.worker_id:
+        self.consumer.subscribe([self.topic_name])
+        while True:
+            messages = self.consumer.consume(num_messages=self.GET_RECORDS_LIMIT)
+            for msg in messages:
+                if msg is None:
+                    # Initial message consumption may take up to
+                    # `session.timeout.ms` for the consumer group to
+                    # rebalance and start consuming
+                    print("Waiting...")
+                elif msg.error():
+                    print("ERROR: %s".format(msg.error()))
+                else:
+                    # Extract the (optional) key and value, and print.
+                    print("Consumed event from topic {topic}: key = {key:12} value = {value:12}".format(
+                        topic=msg.topic(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')))
+                    self.insertion_queue.put(msg)
+                    self.consumer.commit(message=msg)
+
+    @property
+    def group_id(self):
+        """
+        Important -- this is the group ID for the Kafka consumer group.
+        Kafka uses this to keep track of which messages have been consumed.
+        If you change this, you will re-consume all messages unless `auto.offset.reset' is set to 'latest'.
+        """
+        return 'motorway'
 
     def connection_parameters(self):
         """
         Override connection parameters for Kafka.
         """
         return {
-            'bootstrap_servers': self.brokers,
-            'group_id': self.group_id,
-            'auto_offset_reset': 'earliest',
-            'enable_auto_commit': False
+            **super().connection_parameters(),
+            'group.id': self.group_id,
+            'auto.offset.reset': 'latest',  # TODO: make sure this is right
+            'enable.auto.commit': False,
         }
 
-    def _consume_messages(self):
-        """
-        Consume messages from the Kafka topic and enqueue them.
-        """
-        for message in self.consume_messages(group_id=self.group_id):
-            try:
-                self.insertion_queue.put({
-                    'key': message.get('key'),
-                    'value': message.get('value'),
-                    'offset': message.get('offset'),
-                })
-                self.uncompleted_ids.add(message.get('offset'))
-            except Exception as e:
-                logger.exception(f"Failed to process message: {e}")
-
     def next(self):
-        """
-        Fetch the next message from the queue.
-        """
-        msg = self.insertion_queue.get()
+        msg : KafkaMessage = self.insertion_queue.get()
+        partition_number = msg.partition() or 0
         try:
             yield Message(
-                msg['offset'],
-                msg['value'],
-                grouping_value=msg['key']
+                f'{partition_number}-{msg.offset()}',  # Unique ID
+                self.decode_message(msg.value()),
+                grouping_value=msg.key().decode('utf-8'),
             )
         except ValueError as e:
             logger.exception(e)
 
-    def success(self, _id):
-        """
-        Acknowledge successful processing of a message.
-        """
-        if _id in self.uncompleted_ids:
-            self.uncompleted_ids.remove(_id)
-            # Commit the offset for the successfully processed message
-            self.consumer.commit(asynchronous=False, offsets=[{
-                'topic': self.topic_name,
-                'partition': 0,  # Modify if using multiple partitions
-                'offset': _id + 1
-            }])
-
-    def emit(self, value, key=None):
-        """
-        Emit a new message using the mixin's `send_message` method.
-        """
-        try:
-            self.send_message({
-                'key': key,
-                'value': value
-            })
-        except Exception as e:
-            logger.exception(f"Failed to emit message: {e}")
-
-    def shutdown(self):
-        """
-        Cleanup on shutdown.
-        """
-        logger.info("Shutting down KafkaRamp")
-        self.consumer.close()
-        self.producer.flush()
+    #
+    # def dynamodb_connection_parameters(self):
+    #     """Later to be replaced by Redis"""
+    #     return {
+    #         'region_name': 'eu-west-1',
+    #         'service_name': 'dynamodb',
+    #         # Add this or use ENV VARS
+    #         # 'aws_access_key_id': '',
+    #         # 'aws_secret_access_key': '',
+    #     }
+    #
+    # def get_control_table_name(self):
+    #     return 'pipeline-control-%s' % self.topic_name
+    #

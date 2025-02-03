@@ -53,12 +53,14 @@ class WordRamp(Ramp):
 class ExampleSQSRamp(SQSRamp):
     queue_name =  os.getenv('SQS_QUEUE_NAME')
 
+
 class ExampleKinesisRamp(KinesisRamp):
     stream_name = "data-pipeline-test"
 
 
 class ExampleKinesisIntersection(KinesisInsertIntersection):
     stream_name = "data-pipeline-test"
+
 
 class ExampleKafkaRamp(KafkaRamp):
     group_id = "test"

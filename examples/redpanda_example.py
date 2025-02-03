@@ -43,14 +43,13 @@ logging.config.dictConfig({
 })
 
 class WordCountPipeline(Pipeline):
-
     def definition(self):
         self.add_ramp(WordRamp, 'sentence')
         self.add_intersection(SentenceSplitIntersection, 'sentence', 'word_to_kafka')
         self.add_intersection(ExampleKafkaIntersection, 'word_to_kafka')
 
-        # self.add_ramp(ExampleRedPandaRamp, 'word_from_kafka')
-        # self.add_intersection(WordCountIntersection, 'word_from_kafka')
+        self.add_ramp(ExampleKafkaRamp, 'word_from_kafka')
+        self.add_intersection(WordCountIntersection, 'word_from_kafka')
 
 
 if __name__ == '__main__':
