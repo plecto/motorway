@@ -8,7 +8,7 @@ services:
   # Web dashboard http://localhost:5000
   app_redpanda:
     build: .
-    command: python examples/redpanda_example.py
+    command: python examples/kafka_example.py
     volumes:
      - .:/code
     ports:

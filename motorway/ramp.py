@@ -36,7 +36,7 @@ class Ramp(GrouperMixin, SendMessageMixin, ConnectionMixin, object):
         This function is called continuously by the ramp.
 
         .. WARNING::
-            Do not block this for a long time or make a while True loop inside it. Betwen every :func:`motorway.ramp.Ramp.next` run,
+            Do not block this for a long time or make a while True loop inside it. Between every :func:`motorway.ramp.Ramp.next` run,
             some essential operations are run, including receiving acks from the :class:`motorway.controller.Controller`
 
         :yield: :class:`motorway.messages.Message` instance

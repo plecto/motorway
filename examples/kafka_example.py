@@ -22,6 +22,11 @@ logging.config.dictConfig({
             'handlers': ['console'],
             'propagate': False
         },
+        'motorway.contrib.kafka': {
+            'level': 'DEBUG',
+            'handlers': ['console'],
+            'propagate': False
+        },
         'werkzeug': {
             'level': 'WARN',
             'handlers': ['console'],

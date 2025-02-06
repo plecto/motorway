@@ -26,14 +26,14 @@ class WordRamp(Ramp):
 
     def __init__(self, *args, **kwargs):
         super(WordRamp, self).__init__(*args, **kwargs)
-        self.limit = 10000
+        self.limit = 10
         self.progress = 1
 
     def next(self):
         # yield Message(uuid.uuid4().int, self.sentences[random.randint(0, len(self.sentences) -1)])
         if self.progress <= self.limit:
             self.progress += 1
-            # time.sleep(10)
+            time.sleep(10)
             sentence = self.sentences[random.randint(0, len(self.sentences) -1)]
             yield Message(uuid.uuid4().int, sentence, grouping_value=sentence)
         else:
@@ -63,5 +63,4 @@ class ExampleKinesisIntersection(KinesisInsertIntersection):
 
 
 class ExampleKafkaRamp(KafkaRamp):
-    group_id = "test"
     topic_name = "tutorial_motorway"
