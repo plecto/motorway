@@ -1,4 +1,5 @@
 import json
+import os
 
 
 class KafkaMixin:
@@ -20,5 +21,5 @@ class KafkaMixin:
         Connection parameters for Kafka.
         """
         return {
-            'bootstrap.servers': 'redpanda:9092'
+            'bootstrap.servers': os.environ.get('KAFKA_BROKER_URL', 'redpanda:9092')
         }
