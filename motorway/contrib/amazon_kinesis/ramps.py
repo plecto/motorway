@@ -250,7 +250,7 @@ class KinesisRamp(Ramp):
                     # update the heartbeat and the checkpoint
                     control_record['heartbeat'] += 1
                     if len(self.uncompleted_ids[shard_id]):
-                        # Get the "youngest" uncompleted sequence number
+                        # Get the "oldest" uncompleted sequence number
                         control_record['checkpoint'] = min(self.uncompleted_ids[shard_id])
                     elif latest_item:
                         # or the latest item we yielded

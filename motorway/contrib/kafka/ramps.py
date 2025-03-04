@@ -18,9 +18,10 @@ class KafkaRamp(Ramp, KafkaMixin):
     AUTO_OFFSET_RESET = 'latest'
     MAX_UNCOMPLETED_ITEMS = 3000
     GET_RECORDS_LIMIT = 1000
+    THROTTLE_SECONDS = 5
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, consumer_thread_enabled=True, consume_iterations=None, **kwargs):
+        super().__init__(**kwargs)
         assert self.topic_name, "Please define the attribute `topic_name` for your KafkaRamp"
 
         self.insertion_queue = Queue()
@@ -29,6 +30,13 @@ class KafkaRamp(Ramp, KafkaMixin):
         self.consumer = Consumer({
             **self.connection_parameters(),
         })
+        if consumer_thread_enabled:
+            self.start_consumer_thread()
+        else:
+            self.consume(iterations=consume_iterations)
+            logger.info('Skipping consumer thread for topic %s', self.topic_name)
+
+    def start_consumer_thread(self):
         thread = threading.Thread(
             target=self.consume,
             name=f"{self.__class__.__name__}-consume-{self.topic_name}",
@@ -36,31 +44,48 @@ class KafkaRamp(Ramp, KafkaMixin):
         logger.info("Starting Kafka consumer thread for topic %s", self.topic_name)
         thread.start()
 
+    def _too_many_uncompleted_items(self):
+        """
+        Pause consumption if we have too many uncompleted items
+        because we use kafka built-in balancing of consumer group, we need to pause consumption
+        from all assigned partitions even if only one of them has too many uncompleted items
+        """
+        return any(
+                len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
+                for partition in self.uncompleted_ids.keys()
+        )
 
-    def consume(self):
+    def _throttle(self):
+        logger.warning("Too many uncompleted items, pausing consumption for %d seconds", self.THROTTLE_SECONDS)
+        time.sleep(self.THROTTLE_SECONDS)
+
+    def consume(self, iterations=None):
+        """
+        Consume messages from Kafka and put them in the insertion queue.
+
+        :param iterations: Number of iterations to consume before stopping, useful in testing
+        """
         logger.info("Thread starting to consume for topic %s", self.topic_name)
         self.consumer.subscribe([self.topic_name])
-        while True:
-            # TODO: this will pause consumption from all assigned partitions if one partition has too many uncompleted items
-            # This is not ideal, but it's a simple way to prevent the consumer from falling behind
-            for partition in self.uncompleted_ids.keys():
-                if len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS:
-                    logger.warning("Too many uncompleted items, pausing consumption for 5 seconds")
-                    time.sleep(5)
-            messages = self.consumer.consume(num_messages=self.GET_RECORDS_LIMIT, timeout=5)
+        current_iteration = 0
+
+        while iterations is None or current_iteration < iterations:
+            while self._too_many_uncompleted_items():
+                self._throttle()
+            messages = self.consumer.consume(num_messages=self.GET_RECORDS_LIMIT, timeout=1)
+            logger.info("Consumed %s messages from topic %s", len(messages), self.topic_name)
             for msg in messages:
                 if msg is None:
-                    # Initial message consumption may take up to
-                    # `session.timeout.ms` for the consumer group to
-                    # rebalance and start consuming
                     logger.info("Waiting for messages...%s", self.topic_name)
                 elif msg.error():
-                    logger.error("ERROR: %s".format(msg.error()))
+                    logger.error("ERROR in Kafka message: %s", msg.error())
                 else:
-                    logger.debug("Consumed event from topic {topic}: key = {key:12} value = {value:12}".format(
-                        topic=msg.topic(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')))
+                    logger.debug("Consumed event from topic %s: key = %s value = %s",
+                                 msg.topic(), msg.key().decode('utf-8')[:12], msg.value().decode('utf-8')[:12])
                     self.insertion_queue.put(msg)
                     self.uncompleted_ids[msg.partition()].add(msg.offset())
+
+            current_iteration += 1
 
     @property
     def group_id(self):
