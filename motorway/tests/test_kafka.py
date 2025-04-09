@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from motorway.contrib.kafka.ramps import KafkaRamp
-from confluent_kafka import Message as KafkaMessage, TopicPartition
+from confluent_kafka import Message as KafkaMessage
 
 
 class TestKafkaRamp(unittest.TestCase):
@@ -24,6 +24,16 @@ class TestKafkaRamp(unittest.TestCase):
         mock_msg.partition.return_value = 0
         mock_msg.offset.return_value = 1
         return mock_msg
+
+    def assert_commit_call_kwargs(self, method, **kwargs):
+        """
+        Because TopicPartion does not compare its instances correctly,
+        we need to check the kwargs of the call.
+        """
+        for key, value in kwargs.items():
+            called_value = getattr(method.call_args.kwargs['offsets'][0], key)
+            self.assertEquals(called_value, value, f"Expected {key} to be {value}, but got {called_value}")
+
 
     def test_kafka_ramp_initialization(self):
         kafka_ramp = self.get_kafka_ramp()
@@ -54,29 +64,40 @@ class TestKafkaRamp(unittest.TestCase):
 
     def test_success(self):
         kafka_ramp = self.get_kafka_ramp(iterations=1)
+        commit = kafka_ramp.consumer.commit
         kafka_ramp.uncompleted_ids[0].add(1)
 
         kafka_ramp.success('0-1')
 
         self.assertFalse(kafka_ramp.uncompleted_ids[0])  # empty set
-        topic_partition = TopicPartition(topic='test_topic', partition=0, offset=2)  # offset + 1
-        kafka_ramp.consumer.commit.assert_called_once_with(offsets=[topic_partition])
+        self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=2)  # offset + 1
 
     def test_success_multiple_uncompleted_ids(self):
         kafka_ramp = self.get_kafka_ramp(iterations=1)
+        commit = kafka_ramp.consumer.commit
         kafka_ramp.uncompleted_ids[0].update({1, 2, 3})
 
         kafka_ramp.success('0-2')
 
         self.assertEquals({1, 3}, kafka_ramp.uncompleted_ids[0]) # 2 should be removed
-        topic_partition = TopicPartition(topic='test_topic', partition=0, offset=1)  # earlier offset
-        kafka_ramp.consumer.commit.assert_called_once_with(offsets=[topic_partition])
+        self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=1)
 
         # now `1` finished processing, so we should commit `3`
         kafka_ramp.success('0-1')
         self.assertEquals({3}, kafka_ramp.uncompleted_ids[0])  # 1 should be removed as well
-        topic_partition = TopicPartition(topic='test_topic', partition=0, offset=3)  # earlier offset
-        kafka_ramp.consumer.commit.assert_called_with(offsets=[topic_partition])
+        self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=3)
+
+    def test_success_multiple_uncompleted_ids_edge_case(self):
+        kafka_ramp = self.get_kafka_ramp(iterations=1)
+        commit = kafka_ramp.consumer.commit
+        kafka_ramp.uncompleted_ids[0].update({1, 2, 3})
+
+        kafka_ramp.success('0-3')
+        self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=1)
+        kafka_ramp.success('0-2')
+        self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=1)
+        kafka_ramp.success('0-1')
+        self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=2)
 
     def test_consume_throttle(self):
         class ThrottleException(Exception):
