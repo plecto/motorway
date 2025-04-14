@@ -93,10 +93,13 @@ class TestKafkaRamp(unittest.TestCase):
         kafka_ramp.uncompleted_ids[0].update({1, 2, 3})
 
         kafka_ramp.success('0-3')
-        self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=1)
+        self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=1)  # 1 is still uncompleted
         kafka_ramp.success('0-2')
-        self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=1)
+        self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=1) # 1 is still uncompleted
         kafka_ramp.success('0-1')
+        # 1 is completed now, so ideally we should commit 4, but for simplicity we commit 2
+        # because we don't know if 3 was completed or not at this point
+        # on the next iteration we will commit 4
         self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=2)
 
     def test_consume_throttle(self):

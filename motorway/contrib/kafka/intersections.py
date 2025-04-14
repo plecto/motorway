@@ -59,13 +59,13 @@ class KafkaInsertIntersection(Intersection, KafkaMixin):
                         value=record['value'],
                         callback=lambda err, msg, r=record: self._delivery_callback(err, msg, r),
                     )
+                    self.producer.poll(0)  # Process events to handle delivery reports (previous messages).
                 except BufferError:
                     logger.warning("Producer buffer is full, retrying...")
-                    sleep(1)
+                    self.producer.poll(10)
                     continue
 
             # flush to ensure delivery
-            # self.producer.poll(10000)  # TODO: is this needed?
             self.producer.flush()
             records = [r for r in records if 'ack' not in r]
 

@@ -48,7 +48,7 @@ class KafkaRamp(Ramp, KafkaMixin):
         """
         Pause consumption if we have too many uncompleted items
         because we use kafka built-in balancing of consumer group, we need to pause consumption
-        from all assigned partitions even if only one of them has too many uncompleted items
+        from all assigned partitions even if only one of them has too many uncompleted items.
         """
         return any(
                 len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
@@ -126,7 +126,7 @@ class KafkaRamp(Ramp, KafkaMixin):
     def success(self, _id):
         """
         After a message has been successfully processed, commit the offset.
-        Ideally it should be the oldest message in the uncompleted list, but it's not guaranteed.
+        We always commit the oldset uncompleted offset for the partition, so that we don't skip any messages.
         """
         logger.debug("Committing offset for %s", _id)
         partition_number, offset = map(int, _id.split('-'))
