@@ -126,7 +126,7 @@ class KafkaRamp(Ramp, KafkaMixin):
     def success(self, _id):
         """
         After a message has been successfully processed, commit the offset.
-        We always commit the oldset uncompleted offset for the partition, so that we don't skip any messages.
+        We always commit the oldset uncompleted offset for the partition, so that we don't skip any messages when processing is stopped and started again. Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition. 
         """
         logger.debug("Committing offset for %s", _id)
         partition_number, offset = map(int, _id.split('-'))
