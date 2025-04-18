@@ -133,4 +133,4 @@ class KafkaRamp(Ramp, KafkaMixin):
         self.uncompleted_ids[partition_number].remove(offset)
         # commit the oldest offset
         oldest_offset = min(self.uncompleted_ids[partition_number]) if self.uncompleted_ids[partition_number] else offset + 1
-        self.consumer.commit(offsets=[TopicPartition(self.topic_name, partition_number, oldest_offset)])
+        self.consumer.commit(offsets=[TopicPartition(self.topic_name, partition_number, oldest_offset)], asynchronous=True)
