@@ -46,8 +46,8 @@ class KafkaRamp(Ramp, KafkaMixin):
 
     def _too_many_uncompleted_items(self):
         """
-        Pause consumption if we have too many uncompleted items
-        because we use kafka built-in balancing of consumer group, we need to pause consumption
+        Pause consumption if we have too many uncompleted items.
+        Because we use kafka built-in balancing of consumer group, we need to pause consumption
         from all assigned partitions even if only one of them has too many uncompleted items.
         """
         return any(
