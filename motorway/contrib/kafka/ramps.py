@@ -14,6 +14,16 @@ from motorway.ramp import Ramp
 logger = logging.getLogger(__name__)
 
 class KafkaRamp(Ramp, KafkaMixin):
+    """
+    Implementation of a Kafka ramp relying on broker based Kafka consumer groups.
+
+    The first time we call consumer.consume() (polling loop) it is actually joining the consumer group,
+    and receiving a partition assignment.
+
+    If a rebalance occurs, it will be managed within the polling loop along with any associated callbacks.
+    As a result, most issues with the consumer or its listener callbacks are likely to manifest
+    as exceptions raised by consumer.consume() or in message.error().
+    """
     topic_name = None
     AUTO_OFFSET_RESET = 'latest'
     MAX_UNCOMPLETED_ITEMS = 3000

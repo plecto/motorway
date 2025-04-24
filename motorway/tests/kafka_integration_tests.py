@@ -1,4 +1,3 @@
-"""Integration tests for Kafka producer and consumer."""
 import os
 import time
 import unittest
@@ -10,7 +9,8 @@ from confluent_kafka.admin import AdminClient
 
 class KafkaIntegrationTest(unittest.TestCase):
     """
-    Integration tests for Kafka producer and consumer.
+    Integration tests for Kafka producer and consumer, used to demonstrate functionality of Kafka
+    and confluent_kafka library.
     """
 
     def setUp(self):
@@ -113,7 +113,7 @@ class KafkaIntegrationTest(unittest.TestCase):
         consumer.subscribe([self.topic_name])
 
         # Simulate consuming messages
-        messages = consumer.consume(num_messages=11, timeout=1)
+        messages = consumer.consume(num_messages=1, timeout=1)
         print(messages)
         for message in messages:
             if message.error():
@@ -134,31 +134,11 @@ class KafkaIntegrationTest(unittest.TestCase):
             else:
                 print(f"Consumed message: {message.value().decode('utf-8')}")
                 consumer.commit(message)
-        self.assertEquals(len(messages), 1)
-        self.assertEquals(messages[0].error().name(), '_MAX_POLL_EXCEEDED')
-
-        print('Closing consumer after error')
-        consumer.close()  # need to close the consumer
-        print("Initializing consumer again")
-        # need to initialize again
-        consumer = self.get_kafka_consumer(
-            additional_kwargs={
-                'auto.offset.reset': 'earliest',
-                'session.timeout.ms': 6000,  # has to be larger than group.min.session.timeout.ms on the broker
-                'max.poll.interval.ms': 7000,
-            }
-        )
-        consumer.subscribe([self.topic_name])
-        delivered_messages = self.produce_messages(producer, num_messages=10)
-        messages = consumer.consume(num_messages=11, timeout=1)
-        print(len(messages))
-        for message in messages:
-            if message.error():
-                print(f"Error consuming message: {message.error()}")
-            else:
-                print(f"Consumed message: {message.value().decode('utf-8')}")
-                consumer.commit(message)
         self.assertEquals(len(messages), 10)
+        self.assertEquals(messages[0].error().name(), '_MAX_POLL_EXCEEDED')
+        for message in messages[1:]:
+            self.assertIsNone(message.error())
+
 
     def tearDown(self):
         admin_client = AdminClient({
