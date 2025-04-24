@@ -3,18 +3,18 @@ import os
 import time
 import unittest
 import uuid
-from functools import cached_property
 
 from confluent_kafka import Consumer, Producer, TopicPartition, KafkaException
+from confluent_kafka.admin import AdminClient
 
 
 class KafkaIntegrationTest(unittest.TestCase):
     """
     Integration tests for Kafka producer and consumer.
     """
-    @cached_property
-    def topic_name(self):
-        return f'test_{uuid.uuid4()}'
+
+    def setUp(self):
+        self.topic_name = f'test_{uuid.uuid4()}'
 
     def get_kafka_producer(self):
         """
@@ -138,9 +138,9 @@ class KafkaIntegrationTest(unittest.TestCase):
         self.assertEquals(messages[0].error().name(), '_MAX_POLL_EXCEEDED')
 
         print('Closing consumer after error')
-        consumer.close()
+        consumer.close()  # need to close the consumer
         print("Initializing consumer again")
-        # initialize again
+        # need to initialize again
         consumer = self.get_kafka_consumer(
             additional_kwargs={
                 'auto.offset.reset': 'earliest',
@@ -159,3 +159,15 @@ class KafkaIntegrationTest(unittest.TestCase):
                 print(f"Consumed message: {message.value().decode('utf-8')}")
                 consumer.commit(message)
         self.assertEquals(len(messages), 10)
+
+    def tearDown(self):
+        admin_client = AdminClient({
+            'bootstrap.servers': os.environ.get('KAFKA_BROKER_URL', 'localhost:19092')
+        })
+        try:
+            admin_client.delete_topics([self.topic_name], operation_timeout=30)
+            print(f"Topic {self.topic_name} removed successfully.")
+        except Exception as e:
+            print(f"Failed to remove topic {self.topic_name}: {e}")
+
+

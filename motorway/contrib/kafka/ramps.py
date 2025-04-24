@@ -51,13 +51,17 @@ class KafkaRamp(Ramp, KafkaMixin):
         from all assigned partitions even if only one of them has too many uncompleted items.
         """
         return any(
-                len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
-                for partition in self.uncompleted_ids.keys()
+            len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
+            for partition in self.uncompleted_ids.keys()
         )
 
     def _throttle(self):
         logger.warning("Too many uncompleted items, pausing consumption for %d seconds", self.THROTTLE_SECONDS)
         time.sleep(self.THROTTLE_SECONDS)
+        # Consume just one message to avoid exceeding the max poll interval in case we
+        # throttle for longer than the max poll interval
+        msg = self.consumer.poll(0)
+        self._process_message(msg)
 
     def consume(self, iterations=None):
         """
@@ -75,17 +79,20 @@ class KafkaRamp(Ramp, KafkaMixin):
             messages = self.consumer.consume(num_messages=self.GET_RECORDS_LIMIT, timeout=1)
             logger.info("Consumed %s messages from topic %s", len(messages), self.topic_name)
             for msg in messages:
-                if msg is None:
-                    logger.info("Waiting for messages...%s", self.topic_name)
-                elif msg.error():
-                    logger.error("ERROR in Kafka message: %s", msg.error())
-                else:
-                    logger.debug("Consumed event from topic %s: key = %s value = %s",
-                                 msg.topic(), msg.key().decode('utf-8')[:12], msg.value().decode('utf-8')[:12])
-                    self.insertion_queue.put(msg)
-                    self.uncompleted_ids[msg.partition()].add(msg.offset())
+                self._process_message(msg)
 
             current_iteration += 1
+
+    def _process_message(self, msg: KafkaMessage):
+        if msg is None:
+            logger.info("Waiting for messages...%s", self.topic_name)
+        elif msg.error():
+            logger.error("ERROR in Kafka message: %s", msg.error())
+        else:
+            logger.debug("Consumed message from topic %s: key = %s value = %s",
+                         msg.topic(), msg.key().decode('utf-8')[:12], msg.value().decode('utf-8')[:12])
+            self.insertion_queue.put(msg)
+            self.uncompleted_ids[msg.partition()].add(msg.offset())
 
     @property
     def group_id(self):
