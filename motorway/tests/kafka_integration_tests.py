@@ -63,6 +63,19 @@ class KafkaIntegrationTest(unittest.TestCase):
         producer.flush()
         return delivered_messages
 
+    def consume_messages(self, consumer, num_messages, commit=True):
+        messages = consumer.consume(num_messages=num_messages, timeout=1)
+        for message in messages:
+            if message.error():
+                print(f"Error consuming message: {message.error()}")
+                continue
+
+            print(f"Consumed message: {message.value().decode('utf-8')}")
+            if commit:
+                consumer.commit(message)
+
+        return messages
+
     def test_commit_attempt_on_cancelled_consumer(self):
         """
         Test that the consumer fails to commit offsets after exceeding max.poll.interval.
@@ -89,7 +102,7 @@ class KafkaIntegrationTest(unittest.TestCase):
 
         print('Trying to commit offsets after sleep')
         last_message = delivered_messages[-1]
-        # # raises KafkaException: KafkaError{code=UNKNOWN_MEMBER_ID,val=25,str="Commit failed: Broker: Unknown member"}
+        # raises KafkaException: KafkaError{code=UNKNOWN_MEMBER_ID,val=25,str="Commit failed: Broker: Unknown member"}
         with self.assertRaises(KafkaException):
             consumer.commit(offsets=[
                 TopicPartition(self.topic_name, last_message.partition(), last_message.offset()),
@@ -97,9 +110,10 @@ class KafkaIntegrationTest(unittest.TestCase):
                 asynchronous=False
             )
 
+
     def test_consume_attempt_on_cancelled_consumer(self):
         """
-        Test that the consumer fails to consumer after exceeding max.poll.interval.
+        Test that the consumer fixes itself after exceeding max.poll.interval.
         """
         producer = self.get_kafka_producer()
         delivered_messages = self.produce_messages(producer, num_messages=10)
@@ -113,32 +127,19 @@ class KafkaIntegrationTest(unittest.TestCase):
         consumer.subscribe([self.topic_name])
 
         # Simulate consuming messages
-        messages = consumer.consume(num_messages=1, timeout=1)
-        print(messages)
-        for message in messages:
-            if message.error():
-                print(f"Error consuming message: {message.error()}")
-            else:
-                print(f"Consumed message: {message.value().decode('utf-8')}")
-                consumer.commit(message)
+        messages = self.consume_messages(consumer, num_messages=1)
+        self.assertEquals(len(messages), 1)
+        self.assertIsNone(messages[0].error())
 
         # sleep so we exceed the max poll interval
         time.sleep(8)
 
         print('Trying to consume after exceeding max poll interval')
-        messages = consumer.consume(num_messages=11, timeout=1)
-        print(len(messages))
-        for message in messages:
-            if message.error():
-                print(f"Error consuming message: {message.error()}")
-            else:
-                print(f"Consumed message: {message.value().decode('utf-8')}")
-                consumer.commit(message)
-        self.assertEquals(len(messages), 10)
+        messages = self.consume_messages(consumer, num_messages=11)
+        self.assertEquals(len(messages), 10)  # 1 error and 9 valid messages
         self.assertEquals(messages[0].error().name(), '_MAX_POLL_EXCEEDED')
         for message in messages[1:]:
             self.assertIsNone(message.error())
-
 
     def tearDown(self):
         admin_client = AdminClient({
@@ -149,5 +150,3 @@ class KafkaIntegrationTest(unittest.TestCase):
             print(f"Topic {self.topic_name} removed successfully.")
         except Exception as e:
             print(f"Failed to remove topic {self.topic_name}: {e}")
-
-
