@@ -26,10 +26,10 @@ class KafkaInsertIntersection(Intersection, KafkaMixin):
         Modify the bootstrap.servers with your Kafka cluster endpoints.
         """
         return Producer({
-            **self.connection_parameters(),
             'queue.buffering.max.messages': 100000,  # Adjust to your needs
             'message.max.bytes': 1024 * 1024,  # Default is 1 MB, ensure it matches your cluster config
             'enable.idempotence': True  # Ensure delivery exactly once
+            **self.connection_parameters(),
         })
 
     @batch_process(limit=500, wait=1)

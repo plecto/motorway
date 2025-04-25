@@ -111,7 +111,7 @@ class KafkaIntegrationTest(unittest.TestCase):
             )
 
 
-    def test_consume_attempt_on_cancelled_consumer(self):
+    def test_consume_attempt_after_exceeding_max_poll_interval(self):
         """
         Test that the consumer fixes itself after exceeding max.poll.interval.
         """
