@@ -56,4 +56,3 @@ class WordCountPipeline(Pipeline):
 
 if __name__ == '__main__':
     WordCountPipeline().run()
-    #WordCountPipeline(run_controller=False, run_webserver=False, run_connection_discovery=False, controller_bind_address="connections:7007").run()

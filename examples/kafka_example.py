@@ -1,7 +1,7 @@
 import logging.config
 
 from motorway.pipeline import Pipeline
-from examples.ramps import WordRamp, ExampleKafkaRamp
+from examples.ramps import WordRamp, ExampleKafkaRamp, SecondExampleKafkaRamp
 from examples.intersections import SentenceSplitIntersection, WordCountIntersection, ExampleKafkaIntersection
 
 
@@ -54,9 +54,10 @@ class WordCountPipeline(Pipeline):
         self.add_intersection(ExampleKafkaIntersection, 'word_to_kafka')
 
         self.add_ramp(ExampleKafkaRamp, 'word_from_kafka')
+        # add second kafka ramp -- it will work initially but will stop after 10 iterations
+        self.add_ramp(SecondExampleKafkaRamp, 'word_from_kafka')
         self.add_intersection(WordCountIntersection, 'word_from_kafka')
 
 
 if __name__ == '__main__':
     WordCountPipeline().run()
-    #WordCountPipeline(run_controller=False, run_webserver=False, run_connection_discovery=False, controller_bind_address="connections:7007").run()

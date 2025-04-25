@@ -64,3 +64,8 @@ class ExampleKinesisIntersection(KinesisInsertIntersection):
 
 class ExampleKafkaRamp(KafkaRamp):
     topic_name = "tutorial_motorway"
+
+
+class SecondExampleKafkaRamp(ExampleKafkaRamp):
+    consumer_thread_enabled = False
+    consume_iterations = 10
