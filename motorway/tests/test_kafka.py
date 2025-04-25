@@ -1,9 +1,10 @@
 import unittest
 from unittest.mock import patch, MagicMock
 
-from motorway.contrib.kafka.ramps import KafkaRamp
 from confluent_kafka import Message as KafkaMessage
 
+with patch('motorway.contrib.kafka.utils.reinitialize_consumer_on_error', lambda x: x):
+    from motorway.contrib.kafka.ramps import KafkaRamp
 
 class TestKafkaRamp(unittest.TestCase):
     @patch('motorway.contrib.kafka.ramps.Consumer')
@@ -102,13 +103,15 @@ class TestKafkaRamp(unittest.TestCase):
         # on the next iteration we will commit 4
         self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=2)
 
+    @patch('motorway.contrib.kafka.utils.reinitialize_consumer_on_error', lambda x: x)
     def test_consume_throttle(self):
         class ThrottleException(Exception):
             pass
+
         kafka_ramp = self.get_kafka_ramp(iterations=0)
         kafka_ramp.MAX_UNCOMPLETED_ITEMS = 2
         kafka_ramp._throttle = MagicMock(side_effect=ThrottleException)
-        kafka_ramp.uncompleted_ids[0].update({1, 2,})
+        kafka_ramp.uncompleted_ids[0].update({1, 2})
         kafka_ramp.uncompleted_ids[1].update({3, 4, 5})
         kafka_ramp.uncompleted_ids[2].update({6, 7})
 
