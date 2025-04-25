@@ -28,7 +28,7 @@ class KafkaInsertIntersection(Intersection, KafkaMixin):
         return Producer({
             'queue.buffering.max.messages': 100000,  # Adjust to your needs
             'message.max.bytes': 1024 * 1024,  # Default is 1 MB, ensure it matches your cluster config
-            'enable.idempotence': True  # Ensure delivery exactly once
+            'enable.idempotence': True,  # Ensure delivery exactly once
             **self.connection_parameters(),
         })
 

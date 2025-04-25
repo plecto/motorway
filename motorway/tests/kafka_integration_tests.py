@@ -76,7 +76,7 @@ class KafkaIntegrationTest(unittest.TestCase):
 
         return messages
 
-    def test_commit_attempt_on_cancelled_consumer(self):
+    def test_consumer_commit_attempt_on_after_exceeding_max_poll_interval(self):
         """
         Test that the consumer fails to commit offsets after exceeding max.poll.interval.
         """
@@ -86,16 +86,20 @@ class KafkaIntegrationTest(unittest.TestCase):
         def on_revoke(c, partitions):
             print(f"Partitions revoked: {partitions}")
 
+        def on_assign(c, partitions):
+            print(f"Partitions assigned: {partitions}")
+
         consumer = self.get_kafka_consumer(
             additional_kwargs={
+                'auto.offset.reset': 'earliest',
                 'session.timeout.ms': 6000,  # has to be larger than group.min.session.timeout.ms on the broker
                 'max.poll.interval.ms': 7000,
             }
         )
-        consumer.subscribe([self.topic_name], on_revoke=on_revoke)
+        consumer.subscribe([self.topic_name], on_revoke=on_revoke, on_assign=on_assign)
 
         # Simulate consuming messages
-        messages = consumer.consume(num_messages=3, timeout=1)
+        messages = self.consume_messages(consumer, num_messages=3)
 
         # sleep so we exceed the max poll interval
         time.sleep(10)
@@ -109,6 +113,14 @@ class KafkaIntegrationTest(unittest.TestCase):
             ],
                 asynchronous=False
             )
+
+        # consume again, we should be able to commit after that
+        messages = self.consume_messages(consumer, num_messages=3)
+        consumer.commit(offsets=[
+            TopicPartition(self.topic_name, last_message.partition(), last_message.offset()),
+        ],
+            asynchronous=False
+        )
 
 
     def test_consume_attempt_after_exceeding_max_poll_interval(self):

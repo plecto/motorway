@@ -61,6 +61,9 @@ class KafkaRamp(Ramp, KafkaMixin):
         Pause consumption if we have too many uncompleted items.
         Because we use kafka built-in balancing of consumer group, we need to pause consumption
         from all assigned partitions even if only one of them has too many uncompleted items.
+
+        We actually consume 1 message every time we call _throttle() to avoid exceeding the max poll interval
+        (Kafka doesn't allow calling poll without getting messages).
         """
         return any(
             len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
@@ -70,8 +73,8 @@ class KafkaRamp(Ramp, KafkaMixin):
     def _throttle(self):
         logger.warning("Too many uncompleted items, pausing consumption for %d seconds", self.THROTTLE_SECONDS)
         time.sleep(self.THROTTLE_SECONDS)
-        # Consume just one message to avoid exceeding the max poll interval in case we
-        # throttle for longer than the max poll interval
+        # Consume just one message to avoid exceeding the max poll interval
+        # and to allow the consumer to commit
         msg = self.consumer.poll(0)
         self._process_message(msg)
 
@@ -83,7 +86,7 @@ class KafkaRamp(Ramp, KafkaMixin):
         :param iterations: Number of iterations to consume before stopping, useful in testing
         """
         logger.info("Thread starting to consume for topic %s", self.topic_name)
-        self.consumer.subscribe([self.topic_name])
+        self.consumer.subscribe([self.topic_name], on_assign=self.on_assign, on_revoke=self.on_revoke)
         current_iteration = 0
 
         while iterations is None or current_iteration < iterations:
@@ -154,3 +157,19 @@ class KafkaRamp(Ramp, KafkaMixin):
         # commit the oldest offset
         oldest_offset = min(self.uncompleted_ids[partition_number]) if self.uncompleted_ids[partition_number] else offset + 1
         self.consumer.commit(offsets=[TopicPartition(self.topic_name, partition_number, oldest_offset)], asynchronous=True)
+
+    @staticmethod
+    def on_assign(consumer, partitions):
+        formatted_partitions = [
+            f"Topic: {p.topic}, Partition: {p.partition}, Offset: {p.offset}, Error: {p.error}"
+            for p in partitions
+        ]
+        logger.info("Partitions assigned:\n%s", "\n".join(formatted_partitions))
+
+    @staticmethod
+    def on_revoke(consumer, partitions):
+        formatted_partitions = [
+            f"Topic: {p.topic}, Partition: {p.partition}, Offset: {p.offset}, Error: {p.error}"
+            for p in partitions
+        ]
+        logger.info("Partitions revoked:\n%s", "\n".join(formatted_partitions))
