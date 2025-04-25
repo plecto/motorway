@@ -4,7 +4,7 @@ import time
 from collections import defaultdict
 from queue import Queue
 
-from confluent_kafka import Consumer, TopicPartition
+from confluent_kafka import Consumer, TopicPartition, KafkaException
 from confluent_kafka import Message as KafkaMessage
 
 from motorway.contrib.kafka.mixins import KafkaMixin
@@ -100,7 +100,7 @@ class KafkaRamp(Ramp, KafkaMixin):
         if msg is None:
             logger.info("Waiting for messages...%s", self.topic_name)
         elif msg.error():
-            logger.error("ERROR in Kafka message: %s", msg.error())
+            logger.exception(KafkaException(msg.error()))
         else:
             logger.debug("Consumed message from topic %s: key = %s value = %s",
                          msg.topic(), msg.key().decode('utf-8')[:12], msg.value().decode('utf-8')[:12])
