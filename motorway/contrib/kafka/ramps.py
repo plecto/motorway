@@ -8,6 +8,7 @@ from confluent_kafka import Consumer, TopicPartition
 from confluent_kafka import Message as KafkaMessage
 
 from motorway.contrib.kafka.mixins import KafkaMixin
+from motorway.contrib.kafka.utils import reinitialize_consumer_on_error
 from motorway.messages import Message
 from motorway.ramp import Ramp
 
@@ -33,6 +34,7 @@ class KafkaRamp(Ramp, KafkaMixin):
     def __init__(self, consumer_thread_enabled=True, consume_iterations=None, **kwargs):
         super().__init__(**kwargs)
         assert self.topic_name, "Please define the attribute `topic_name` for your KafkaRamp"
+        self.logger = logger
 
         self.insertion_queue = Queue()
         self.uncompleted_ids = defaultdict(set)
@@ -73,6 +75,7 @@ class KafkaRamp(Ramp, KafkaMixin):
         msg = self.consumer.poll(0)
         self._process_message(msg)
 
+    @reinitialize_consumer_on_error
     def consume(self, iterations=None):
         """
         Consume messages from Kafka and put them in the insertion queue.
@@ -143,7 +146,7 @@ class KafkaRamp(Ramp, KafkaMixin):
     def success(self, _id):
         """
         After a message has been successfully processed, commit the offset.
-        We always commit the oldset uncompleted offset for the partition, so that we don't skip any messages when processing is stopped and started again. Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition. 
+        We always commit the oldest uncompleted offset for the partition, so that we don't skip any messages when processing is stopped and started again. Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition.
         """
         logger.debug("Committing offset for %s", _id)
         partition_number, offset = map(int, _id.split('-'))
