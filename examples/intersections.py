@@ -3,6 +3,7 @@ import random
 import time
 import uuid
 from motorway.contrib.amazon_sqs.intersections import SQSInsertIntersection
+from motorway.contrib.kafka.intersections import KafkaInsertIntersection
 from motorway.decorators import batch_process
 from motorway.messages import Message
 from motorway.intersection import Intersection
@@ -55,3 +56,7 @@ class AggregateConsumerIntersection(Intersection):
 
 class ExampleSQSIntersection(SQSInsertIntersection):
     queue_name = "tutorial_motorway"
+
+
+class ExampleKafkaIntersection(KafkaInsertIntersection):
+    topic_name = "tutorial_motorway"

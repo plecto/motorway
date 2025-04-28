@@ -1,8 +1,10 @@
+import os
 import time
 import uuid
 from motorway.contrib.amazon_kinesis.ramps import KinesisRamp
 from motorway.contrib.amazon_kinesis.intersections import KinesisInsertIntersection
 from motorway.contrib.amazon_sqs.ramps import SQSRamp
+from motorway.contrib.kafka.ramps import KafkaRamp
 from motorway.messages import Message
 from motorway.ramp import Ramp
 import random
@@ -24,14 +26,14 @@ class WordRamp(Ramp):
 
     def __init__(self, *args, **kwargs):
         super(WordRamp, self).__init__(*args, **kwargs)
-        self.limit = 10000
+        self.limit = 10
         self.progress = 1
 
     def next(self):
         # yield Message(uuid.uuid4().int, self.sentences[random.randint(0, len(self.sentences) -1)])
         if self.progress <= self.limit:
             self.progress += 1
-            # time.sleep(10)
+            time.sleep(10)
             sentence = self.sentences[random.randint(0, len(self.sentences) -1)]
             yield Message(uuid.uuid4().int, sentence, grouping_value=sentence)
         else:
@@ -49,7 +51,7 @@ class WordRamp(Ramp):
 
 
 class ExampleSQSRamp(SQSRamp):
-    queue_name = "tutorial_motorway"
+    queue_name =  os.getenv('SQS_QUEUE_NAME')
 
 
 class ExampleKinesisRamp(KinesisRamp):
@@ -58,3 +60,12 @@ class ExampleKinesisRamp(KinesisRamp):
 
 class ExampleKinesisIntersection(KinesisInsertIntersection):
     stream_name = "data-pipeline-test"
+
+
+class ExampleKafkaRamp(KafkaRamp):
+    topic_name = "tutorial_motorway"
+
+
+class SecondExampleKafkaRamp(ExampleKafkaRamp):
+    consumer_thread_enabled = False
+    consume_iterations = 10

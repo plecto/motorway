@@ -1,4 +1,5 @@
 from motorway.pipeline import Pipeline
+import logging
 import logging.config
 
 logging.config.dictConfig({

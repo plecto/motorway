@@ -1,11 +1,11 @@
-import logging
 import logging.config
-from motorway.grouping import HashRingGrouper
 
 from motorway.pipeline import Pipeline
-from examples.ramps import WordRamp
-from examples.intersections import SentenceSplitIntersection, WordCountIntersection, AggregateIntersection
+from examples.ramps import WordRamp, ExampleKafkaRamp, SecondExampleKafkaRamp
+from examples.intersections import SentenceSplitIntersection, WordCountIntersection, ExampleKafkaIntersection
 
+
+logging.basicConfig(level=logging.DEBUG)
 
 logging.config.dictConfig({
     'version': 1,
@@ -19,6 +19,11 @@ logging.config.dictConfig({
     'loggers': {
         'motorway': {
             'level': 'WARN',
+            'handlers': ['console'],
+            'propagate': False
+        },
+        'motorway.contrib.kafka': {
+            'level': 'DEBUG',
             'handlers': ['console'],
             'propagate': False
         },
@@ -42,14 +47,17 @@ logging.config.dictConfig({
 
 })
 
-
 class WordCountPipeline(Pipeline):
     def definition(self):
         self.add_ramp(WordRamp, 'sentence')
-        self.add_intersection(SentenceSplitIntersection, 'sentence', 'word', processes=2)
-        self.add_intersection(WordCountIntersection, 'word', 'word_count', grouper_cls=HashRingGrouper, processes=2)
-        self.add_intersection(AggregateIntersection, 'word_count', processes=1)
+        self.add_intersection(SentenceSplitIntersection, 'sentence', 'word_to_kafka')
+        self.add_intersection(ExampleKafkaIntersection, 'word_to_kafka')
+
+        self.add_ramp(ExampleKafkaRamp, 'word_from_kafka')
+        # add second kafka ramp -- it will work initially but will stop after 10 iterations
+        self.add_ramp(SecondExampleKafkaRamp, 'word_from_kafka')
+        self.add_intersection(WordCountIntersection, 'word_from_kafka')
 
 
 if __name__ == '__main__':
-    WordCountPipeline(run_controller=False, run_webserver=False, run_connection_discovery=False, controller_bind_address="connections:7007").run()
+    WordCountPipeline().run()
