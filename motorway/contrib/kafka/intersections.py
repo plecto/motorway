@@ -39,6 +39,7 @@ class KafkaInsertIntersection(Intersection, KafkaMixin):
         Each batch can contain up to 500 records, but Kafka allows larger limits per partition.
         The function retries failed deliveries and logs errors for further inspection.
         """
+        logger.debug('%s: Processing %d messages for topic %s', self.__class__.__name__, len(messages), self.topic_name)
         records = []
         for message in messages:
             try:
@@ -66,6 +67,7 @@ class KafkaInsertIntersection(Intersection, KafkaMixin):
                     continue
 
             # flush to ensure delivery
+            logger.debug('%s: flushing producer', self.__class__.__name__)
             self.producer.flush()
             records = [r for r in records if 'ack' not in r]
 
