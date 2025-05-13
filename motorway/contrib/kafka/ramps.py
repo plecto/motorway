@@ -93,7 +93,7 @@ class KafkaRamp(Ramp, KafkaMixin):
             while self._too_many_uncompleted_items():
                 self._throttle()
             messages = self.consumer.consume(num_messages=self.GET_RECORDS_LIMIT, timeout=1)
-            logger.info("Consumed %s messages from topic %s", len(messages), self.topic_name)
+            self.log_message_consumption(messages, current_iteration)
             for msg in messages:
                 self._process_message(msg)
 
@@ -173,3 +173,7 @@ class KafkaRamp(Ramp, KafkaMixin):
             for p in partitions
         ]
         logger.info("Partitions revoked:\n%s", "\n".join(formatted_partitions))
+
+    def log_message_consumption(self, messages, current_iteration):
+        if len(messages) or current_iteration % 50 == 0:
+            logger.debug("Consumed %s messages from topic %s", len(messages), self.topic_name)
