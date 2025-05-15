@@ -27,8 +27,8 @@ class KafkaRamp(Ramp, KafkaMixin):
     """
     topic_name = None
     AUTO_OFFSET_RESET = 'latest'
-    MAX_UNCOMPLETED_ITEMS = 3000
-    GET_RECORDS_LIMIT = 1000
+    MAX_UNCOMPLETED_ITEMS = 10_000
+    GET_RECORDS_LIMIT = 3000
     THROTTLE_SECONDS = 5
 
     def __init__(self, consumer_thread_enabled=True, consume_iterations=None, **kwargs):
