@@ -38,6 +38,7 @@ class KafkaRamp(Ramp, KafkaMixin):
 
         self.insertion_queue = Queue()
         self.uncompleted_ids = defaultdict(set)
+        self.commited_offsets = defaultdict(lambda: 0)
 
         self.consumer = Consumer({
             **self.connection_parameters(),
@@ -117,7 +118,7 @@ class KafkaRamp(Ramp, KafkaMixin):
         Kafka uses this to keep track of which messages have been consumed.
         If you change this, you will re-consume all messages unless `auto.offset.reset' is set to 'latest'.
         """
-        return 'motorway'
+        return f'motorway-{self.topic_name}'
 
     @staticmethod
     def get_message_id(msg: KafkaMessage):
@@ -149,14 +150,19 @@ class KafkaRamp(Ramp, KafkaMixin):
     def success(self, _id):
         """
         After a message has been successfully processed, commit the offset.
-        We always commit the oldest uncompleted offset for the partition, so that we don't skip any messages when processing is stopped and started again. Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition.
+        We always commit the oldest uncompleted offset for the partition, so that we don't skip any messages
+        when processing is stopped and started again.
+        Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition.
         """
-        logger.debug("Committing offset for %s", _id)
         partition_number, offset = map(int, _id.split('-'))
         self.uncompleted_ids[partition_number].remove(offset)
         # commit the oldest offset
         oldest_offset = min(self.uncompleted_ids[partition_number]) if self.uncompleted_ids[partition_number] else offset + 1
-        self.consumer.commit(offsets=[TopicPartition(self.topic_name, partition_number, oldest_offset)], asynchronous=True)
+        if oldest_offset > self.commited_offsets[partition_number]:  # only commit if the offset is newer
+            self.commited_offsets[partition_number] = oldest_offset
+            topic_partition = TopicPartition(self.topic_name, partition_number, oldest_offset)
+            self.consumer.commit(offsets=[topic_partition], asynchronous=True)
+            logger.debug("Committing offset for topic %s: %s", self.topic_name, _id)
 
     @staticmethod
     def on_assign(consumer, partitions):
@@ -175,5 +181,5 @@ class KafkaRamp(Ramp, KafkaMixin):
         logger.info("Partitions revoked:\n%s", "\n".join(formatted_partitions))
 
     def log_message_consumption(self, messages, current_iteration):
-        if len(messages) or current_iteration % 50 == 0:
+        if len(messages) or current_iteration % 100 == 0:
             logger.debug("Consumed %s messages from topic %s", len(messages), self.topic_name)

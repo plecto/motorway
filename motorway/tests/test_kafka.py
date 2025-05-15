@@ -39,7 +39,8 @@ class TestKafkaRamp(unittest.TestCase):
     def test_kafka_ramp_initialization(self):
         kafka_ramp = self.get_kafka_ramp()
 
-        kafka_ramp.consumer.subscribe.assert_called_once_with(['test_topic'])
+        kafka_ramp.consumer.subscribe.assert_called_once()
+        self.assertEquals(kafka_ramp.consumer.subscribe.call_args.args[0],['test_topic'])
         self.assertEquals(kafka_ramp.consumer.consume.call_count, 5)
 
     def test_consume_message(self):
