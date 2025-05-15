@@ -57,6 +57,13 @@ class KafkaRamp(Ramp, KafkaMixin):
         logger.info("Starting Kafka consumer thread for topic %s", self.topic_name)
         thread.start()
 
+    def _get_blocked_partitions(self):
+        return [
+            str(partition)
+            for partition in self.uncompleted_ids.keys()
+            if len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
+        ]
+
     def _too_many_uncompleted_items(self):
         """
         Pause consumption if we have too many uncompleted items.
@@ -66,13 +73,11 @@ class KafkaRamp(Ramp, KafkaMixin):
         We actually consume 1 message every time we call _throttle() to avoid exceeding the max poll interval
         (Kafka doesn't allow calling poll without getting messages).
         """
-        return any(
-            len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
-            for partition in self.uncompleted_ids.keys()
-        )
+        return any(self._get_blocked_partitions())
 
     def _throttle(self):
-        logger.warning("Too many uncompleted items, pausing consumption for %d seconds", self.THROTTLE_SECONDS)
+        blocked_partitions = ', '.join(self._get_blocked_partitions())
+        logger.warning("Too many uncompleted items for partitions %s, pausing consumption for %d seconds", blocked_partitions, self.THROTTLE_SECONDS)
         time.sleep(self.THROTTLE_SECONDS)
         # Consume just one message to avoid exceeding the max poll interval
         # and to allow the consumer to commit
@@ -97,6 +102,8 @@ class KafkaRamp(Ramp, KafkaMixin):
             self.log_message_consumption(messages, current_iteration)
             for msg in messages:
                 self._process_message(msg)
+
+            self.logging_hook(current_iteration)
 
             current_iteration += 1
 
@@ -183,3 +190,7 @@ class KafkaRamp(Ramp, KafkaMixin):
     def log_message_consumption(self, messages, current_iteration):
         if len(messages) or current_iteration % 100 == 0:
             logger.debug("Consumed %s messages from topic %s", len(messages), self.topic_name)
+
+    def logging_hook(self, current_iteration):
+        """Custom hook to override in the application invoked from the main consume loop."""
+        pass
