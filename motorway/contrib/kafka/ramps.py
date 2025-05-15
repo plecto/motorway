@@ -27,8 +27,8 @@ class KafkaRamp(Ramp, KafkaMixin):
     """
     topic_name = None
     AUTO_OFFSET_RESET = 'latest'
-    MAX_UNCOMPLETED_ITEMS = 3000
-    GET_RECORDS_LIMIT = 1000
+    MAX_UNCOMPLETED_ITEMS = 10_000
+    GET_RECORDS_LIMIT = 3000
     THROTTLE_SECONDS = 5
 
     def __init__(self, consumer_thread_enabled=True, consume_iterations=None, **kwargs):
@@ -38,6 +38,7 @@ class KafkaRamp(Ramp, KafkaMixin):
 
         self.insertion_queue = Queue()
         self.uncompleted_ids = defaultdict(set)
+        self.commited_offsets = defaultdict(lambda: 0)
 
         self.consumer = Consumer({
             **self.connection_parameters(),
@@ -56,6 +57,13 @@ class KafkaRamp(Ramp, KafkaMixin):
         logger.info("Starting Kafka consumer thread for topic %s", self.topic_name)
         thread.start()
 
+    def _get_blocked_partitions(self):
+        return [
+            str(partition)
+            for partition in self.uncompleted_ids.keys()
+            if len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
+        ]
+
     def _too_many_uncompleted_items(self):
         """
         Pause consumption if we have too many uncompleted items.
@@ -65,13 +73,11 @@ class KafkaRamp(Ramp, KafkaMixin):
         We actually consume 1 message every time we call _throttle() to avoid exceeding the max poll interval
         (Kafka doesn't allow calling poll without getting messages).
         """
-        return any(
-            len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
-            for partition in self.uncompleted_ids.keys()
-        )
+        return any(self._get_blocked_partitions())
 
     def _throttle(self):
-        logger.warning("Too many uncompleted items, pausing consumption for %d seconds", self.THROTTLE_SECONDS)
+        blocked_partitions = ', '.join(self._get_blocked_partitions())
+        logger.warning("Too many uncompleted items for partitions %s, pausing consumption for %d seconds", blocked_partitions, self.THROTTLE_SECONDS)
         time.sleep(self.THROTTLE_SECONDS)
         # Consume just one message to avoid exceeding the max poll interval
         # and to allow the consumer to commit
@@ -97,6 +103,8 @@ class KafkaRamp(Ramp, KafkaMixin):
             for msg in messages:
                 self._process_message(msg)
 
+            self.logging_hook(current_iteration)
+
             current_iteration += 1
 
     def _process_message(self, msg: KafkaMessage):
@@ -117,7 +125,7 @@ class KafkaRamp(Ramp, KafkaMixin):
         Kafka uses this to keep track of which messages have been consumed.
         If you change this, you will re-consume all messages unless `auto.offset.reset' is set to 'latest'.
         """
-        return 'motorway'
+        return f'motorway-{self.topic_name}'
 
     @staticmethod
     def get_message_id(msg: KafkaMessage):
@@ -149,14 +157,19 @@ class KafkaRamp(Ramp, KafkaMixin):
     def success(self, _id):
         """
         After a message has been successfully processed, commit the offset.
-        We always commit the oldest uncompleted offset for the partition, so that we don't skip any messages when processing is stopped and started again. Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition.
+        We always commit the oldest uncompleted offset for the partition, so that we don't skip any messages
+        when processing is stopped and started again.
+        Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition.
         """
-        logger.debug("Committing offset for %s", _id)
         partition_number, offset = map(int, _id.split('-'))
         self.uncompleted_ids[partition_number].remove(offset)
         # commit the oldest offset
         oldest_offset = min(self.uncompleted_ids[partition_number]) if self.uncompleted_ids[partition_number] else offset + 1
-        self.consumer.commit(offsets=[TopicPartition(self.topic_name, partition_number, oldest_offset)], asynchronous=True)
+        if oldest_offset > self.commited_offsets[partition_number]:  # only commit if the offset is newer
+            self.commited_offsets[partition_number] = oldest_offset
+            topic_partition = TopicPartition(self.topic_name, partition_number, oldest_offset)
+            self.consumer.commit(offsets=[topic_partition], asynchronous=True)
+            logger.debug("Committing offset for topic %s: %s", self.topic_name, _id)
 
     @staticmethod
     def on_assign(consumer, partitions):
@@ -175,5 +188,9 @@ class KafkaRamp(Ramp, KafkaMixin):
         logger.info("Partitions revoked:\n%s", "\n".join(formatted_partitions))
 
     def log_message_consumption(self, messages, current_iteration):
-        if len(messages) or current_iteration % 50 == 0:
+        if len(messages) or current_iteration % 100 == 0:
             logger.debug("Consumed %s messages from topic %s", len(messages), self.topic_name)
+
+    def logging_hook(self, current_iteration):
+        """Custom hook to override in the application invoked from the main consume loop."""
+        pass
