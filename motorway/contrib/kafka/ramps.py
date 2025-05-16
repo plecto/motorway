@@ -162,6 +162,9 @@ class KafkaRamp(Ramp, KafkaMixin):
         Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition.
         """
         partition_number, offset = map(int, _id.split('-'))
+        if offset not in self.uncompleted_ids[partition_number]:
+            logger.warning("Offset %s not in uncompleted ids for partition %s", offset, partition_number)
+            return
         self.uncompleted_ids[partition_number].remove(offset)
         # commit the oldest offset
         oldest_offset = min(self.uncompleted_ids[partition_number]) if self.uncompleted_ids[partition_number] else offset + 1
