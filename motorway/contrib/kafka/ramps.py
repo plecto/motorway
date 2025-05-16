@@ -101,20 +101,22 @@ class KafkaRamp(Ramp, KafkaMixin):
             messages = self.consumer.consume(num_messages=self.GET_RECORDS_LIMIT, timeout=1)
             self.log_message_consumption(messages, current_iteration)
             for msg in messages:
-                self._process_message(msg)
+                self._process_message(msg, log_consumption=False)
 
             self.logging_hook(current_iteration)
 
             current_iteration += 1
 
-    def _process_message(self, msg: KafkaMessage):
+    def _process_message(self, msg: KafkaMessage, log_consumption=True):
         if msg is None:
             logger.info("Waiting for messages...%s", self.topic_name)
         elif msg.error():
             logger.exception(KafkaException(msg.error()))
         else:
-            logger.debug("Consumed message from topic %s: key = %s value = %s",
-                         msg.topic(), msg.key().decode('utf-8')[:12], msg.value().decode('utf-8')[:12])
+            message_id = self.get_message_id(msg)
+            if log_consumption:
+                logger.debug("Processing message from topic %s: id = %s key = %s value = %s",
+                             msg.topic(), message_id, msg.key().decode('utf-8')[:12], msg.value().decode('utf-8')[:12])
             self.insertion_queue.put(msg)
             self.uncompleted_ids[msg.partition()].add(msg.offset())
 
