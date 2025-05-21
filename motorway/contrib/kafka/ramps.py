@@ -27,7 +27,8 @@ class KafkaRamp(Ramp, KafkaMixin):
     """
     topic_name = None
     AUTO_OFFSET_RESET = 'latest'
-    MAX_UNCOMPLETED_ITEMS = 3000
+    MAX_UNCOMPLETED_ITEMS_PER_PARTITION = 3000  # Per partition limit
+    MAX_TOTAL_UNCOMPLETED_ITEMS = 10000  # Global limit across all partitions
     GET_RECORDS_LIMIT = 1000
     THROTTLE_SECONDS = 5
 
@@ -61,19 +62,26 @@ class KafkaRamp(Ramp, KafkaMixin):
         return [
             str(partition)
             for partition in self.uncompleted_ids.keys()
-            if len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
+            if len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS_PER_PARTITION
         ]
+
+    def _get_total_uncompleted_items(self):
+        """
+        Calculate the total number of uncompleted items across all partitions.
+        """
+        return sum(len(items) for items in self.uncompleted_ids.values())
 
     def _too_many_uncompleted_items(self):
         """
         Pause consumption if we have too many uncompleted items.
+        This checks both per-partition limits and the global limit across all partitions.
         Because we use kafka built-in balancing of consumer group, we need to pause consumption
         from all assigned partitions even if only one of them has too many uncompleted items.
 
         We actually consume 1 message every time we call _throttle() to avoid exceeding the max poll interval
         (Kafka doesn't allow calling poll without getting messages).
         """
-        return any(self._get_blocked_partitions())
+        return any(self._get_blocked_partitions()) or self._get_total_uncompleted_items() > self.MAX_TOTAL_UNCOMPLETED_ITEMS
 
     def _throttle(self):
         blocked_partitions = ', '.join(self._get_blocked_partitions())
