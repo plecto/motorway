@@ -1,10 +1,11 @@
 import datetime
-
 import itertools
 import random
-
+import logging
 import zmq
 import time
+
+logger = logging.getLogger(__name__)
 
 from motorway.exceptions import SocketBlockedException
 from motorway.grouping import HashRingGrouper, RandomGrouper, GroupingValueMissing, SendToAllGrouper
@@ -24,9 +25,8 @@ class GrouperMixin(object):
 
 class SendMessageMixin(object):
 
-    def send_message(self, message, process_id, time_consumed=None, sender=None, control_message=True, retries=100):
+    def send_message(self, message: Message, process_id, time_consumed=None, sender=None, control_message=True, retries=100):
         """
-
         :param message: A ::pipeline.messages.Message:: instance
         :param process_id:
         :param time_consumed:
@@ -41,12 +41,32 @@ class SendMessageMixin(object):
             socket_addresses = self.grouper_instance.get_destinations_for(message.grouping_value)
         except GroupingValueMissing:
             raise GroupingValueMissing("Message '%s' provided an invalid grouping_value: '%s'" % (message.content, message.grouping_value))
+        
         for destination in socket_addresses:
-            message.send(
-                self.send_socks[destination],
-                process_id
-            )
+            send_start = time.time()
+            try:
+                message.send(
+                    self.send_socks[destination],
+                    process_id
+                )
+                send_duration = time.time() - send_start
+                if send_duration > 0.1:  # Log if send takes more than 100ms
+                    # Get the process name for this destination
+                    dest_process_id = self.process_address_to_uuid.get(destination)
+                    dest_process_name = self.process_id_to_name.get(dest_process_id, 'unknown')
+                    logger.warning(
+                        f"ZMQ send to {dest_process_name} ({destination}) took {send_duration:.2f}s - possible HWM backpressure"
+                    )
+            except zmq.Again as e:
+                dest_process_id = self.process_address_to_uuid.get(destination)
+                dest_process_name = self.process_id_to_name.get(dest_process_id, 'unknown')
+                logger.error(
+                    f"ZMQ send to {dest_process_name} ({destination}) failed with timeout after {time.time() - send_start:.2f}s"
+                )
+                raise SocketBlockedException(f"Send to {dest_process_name} ({destination}) failed: {str(e)}")
+
             if self.controller_sock and self.send_control_messages and control_message:
+                control_start = time.time()
                 for index in range(0, retries):
                     try:
                         message.send_control_message(
@@ -63,6 +83,7 @@ class SendMessageMixin(object):
                     except zmq.Again:  # If connection fails, retry
                         time.sleep(random.randrange(1, 3))
                 else:  # if for loop exited cleanly (no break)
+                    logger.error(f"Control message send failed after {time.time() - control_start:.2f}s and {retries} retries")
                     raise SocketBlockedException("Control Message for process %s could not be sent after %s attempts"
                                                  % (process_id, retries))
 
