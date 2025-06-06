@@ -104,6 +104,14 @@ class TestKafkaRamp(unittest.TestCase):
         # on the next iteration we will commit 4
         self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=2)
 
+    def test_failed(self):
+        kafka_ramp = self.get_kafka_ramp(iterations=1)
+        kafka_ramp.uncompleted_ids[0].add(1)
+
+        kafka_ramp.failed('0-1')
+
+        self.assertFalse(kafka_ramp.uncompleted_ids[0])  # empty set
+
     @patch('motorway.contrib.kafka.utils.reinitialize_consumer_on_error', lambda x: x)
     def test_consume_throttle(self):
         class ThrottleException(Exception):

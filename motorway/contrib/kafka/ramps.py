@@ -142,6 +142,19 @@ class KafkaRamp(Ramp, KafkaMixin):
         partition_number = msg.partition() or 0
         return f"{partition_number}-{msg.offset()}"
 
+    @staticmethod
+    def parse_message_id(message_id: str):
+        """
+        Parse the message ID to get partition number and offset.
+        :param message_id: The message ID in the format "partition_number-offset"
+        :return: Tuple of (partition_number, offset)
+        """
+        try:
+            partition_number, offset = map(int, message_id.split('-'))
+            return partition_number, offset
+        except ValueError as e:
+            raise ValueError(f"Invalid message ID format: {message_id}") from e
+
     def connection_parameters(self):
         """
         Override connection parameters for Kafka.
@@ -164,14 +177,14 @@ class KafkaRamp(Ramp, KafkaMixin):
         except ValueError as e:
             logger.exception(e)
 
-    def success(self, _id):
+    def success(self, message_id: str):
         """
         After a message has been successfully processed, commit the offset.
         We always commit the oldest uncompleted offset for the partition, so that we don't skip any messages
         when processing is stopped and started again.
         Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition.
         """
-        partition_number, offset = map(int, _id.split('-'))
+        partition_number, offset = self.parse_message_id(message_id)
         if offset not in self.uncompleted_ids[partition_number]:
             logger.warning("Offset %s not in uncompleted ids for partition %s", offset, partition_number)
             return
@@ -182,7 +195,20 @@ class KafkaRamp(Ramp, KafkaMixin):
             self.commited_offsets[partition_number] = oldest_offset
             topic_partition = TopicPartition(self.topic_name, partition_number, oldest_offset)
             self.consumer.commit(offsets=[topic_partition], asynchronous=True)
-            logger.debug("Committing offset for topic %s: %s", self.topic_name, _id)
+            logger.debug("Committing offset for topic %s: %s", self.topic_name, message_id)
+
+    def failed(self, message_id: str):
+        """
+        Log failed message processing and remove it from uncompleted_ids, so it doesn't block processing.
+
+        Override this method to implement custom failure handling logic like retrying or alerting.
+        """
+        partition_number, offset = self.parse_message_id(message_id)
+        if offset not in self.uncompleted_ids[partition_number]:
+            logger.warning('Failed message %s not found in uncompleted_ids', message_id)
+            return
+        self.uncompleted_ids[partition_number].remove(offset)
+        logger.warning('Message %s failed in %s', message_id, self.__class__.__name__)
 
     @staticmethod
     def on_assign(consumer, partitions):
