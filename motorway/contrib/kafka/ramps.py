@@ -27,7 +27,8 @@ class KafkaRamp(Ramp, KafkaMixin):
     """
     topic_name = None
     AUTO_OFFSET_RESET = 'latest'
-    MAX_UNCOMPLETED_ITEMS = 3000
+    MAX_UNCOMPLETED_ITEMS_PER_PARTITION = 3000  # Per partition limit
+    MAX_TOTAL_UNCOMPLETED_ITEMS = 10000  # Global limit across all partitions
     GET_RECORDS_LIMIT = 1000
     THROTTLE_SECONDS = 5
 
@@ -38,6 +39,7 @@ class KafkaRamp(Ramp, KafkaMixin):
 
         self.insertion_queue = Queue()
         self.uncompleted_ids = defaultdict(set)
+        self.commited_offsets = defaultdict(lambda: 0)
 
         self.consumer = Consumer({
             **self.connection_parameters(),
@@ -56,22 +58,34 @@ class KafkaRamp(Ramp, KafkaMixin):
         logger.info("Starting Kafka consumer thread for topic %s", self.topic_name)
         thread.start()
 
+    def _get_blocked_partitions(self):
+        return [
+            str(partition)
+            for partition in self.uncompleted_ids.keys()
+            if len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS_PER_PARTITION
+        ]
+
+    def _get_total_uncompleted_items(self):
+        """
+        Calculate the total number of uncompleted items across all partitions.
+        """
+        return sum(len(items) for items in self.uncompleted_ids.values())
+
     def _too_many_uncompleted_items(self):
         """
         Pause consumption if we have too many uncompleted items.
+        This checks both per-partition limits and the global limit across all partitions.
         Because we use kafka built-in balancing of consumer group, we need to pause consumption
         from all assigned partitions even if only one of them has too many uncompleted items.
 
         We actually consume 1 message every time we call _throttle() to avoid exceeding the max poll interval
         (Kafka doesn't allow calling poll without getting messages).
         """
-        return any(
-            len(self.uncompleted_ids[partition]) > self.MAX_UNCOMPLETED_ITEMS
-            for partition in self.uncompleted_ids.keys()
-        )
+        return any(self._get_blocked_partitions()) or self._get_total_uncompleted_items() > self.MAX_TOTAL_UNCOMPLETED_ITEMS
 
     def _throttle(self):
-        logger.warning("Too many uncompleted items, pausing consumption for %d seconds", self.THROTTLE_SECONDS)
+        blocked_partitions = ', '.join(self._get_blocked_partitions())
+        logger.warning("Too many uncompleted items for partitions %s, pausing consumption for %d seconds", blocked_partitions, self.THROTTLE_SECONDS)
         time.sleep(self.THROTTLE_SECONDS)
         # Consume just one message to avoid exceeding the max poll interval
         # and to allow the consumer to commit
@@ -95,18 +109,22 @@ class KafkaRamp(Ramp, KafkaMixin):
             messages = self.consumer.consume(num_messages=self.GET_RECORDS_LIMIT, timeout=1)
             self.log_message_consumption(messages, current_iteration)
             for msg in messages:
-                self._process_message(msg)
+                self._process_message(msg, log_consumption=False)
+
+            self.logging_hook(current_iteration)
 
             current_iteration += 1
 
-    def _process_message(self, msg: KafkaMessage):
+    def _process_message(self, msg: KafkaMessage, log_consumption=True):
         if msg is None:
             logger.info("Waiting for messages...%s", self.topic_name)
         elif msg.error():
             logger.exception(KafkaException(msg.error()))
         else:
-            logger.debug("Consumed message from topic %s: key = %s value = %s",
-                         msg.topic(), msg.key().decode('utf-8')[:12], msg.value().decode('utf-8')[:12])
+            message_id = self.get_message_id(msg)
+            if log_consumption:
+                logger.debug("Processing message from topic %s: id = %s key = %s value = %s",
+                             msg.topic(), message_id, msg.key().decode('utf-8')[:12], msg.value().decode('utf-8')[:12])
             self.insertion_queue.put(msg)
             self.uncompleted_ids[msg.partition()].add(msg.offset())
 
@@ -117,12 +135,25 @@ class KafkaRamp(Ramp, KafkaMixin):
         Kafka uses this to keep track of which messages have been consumed.
         If you change this, you will re-consume all messages unless `auto.offset.reset' is set to 'latest'.
         """
-        return 'motorway'
+        return f'motorway-{self.topic_name}'
 
     @staticmethod
     def get_message_id(msg: KafkaMessage):
         partition_number = msg.partition() or 0
         return f"{partition_number}-{msg.offset()}"
+
+    @staticmethod
+    def parse_message_id(message_id: str):
+        """
+        Parse the message ID to get partition number and offset.
+        :param message_id: The message ID in the format "partition_number-offset"
+        :return: Tuple of (partition_number, offset)
+        """
+        try:
+            partition_number, offset = map(int, message_id.split('-'))
+            return partition_number, offset
+        except ValueError as e:
+            raise ValueError(f"Invalid message ID format: {message_id}") from e
 
     def connection_parameters(self):
         """
@@ -146,17 +177,38 @@ class KafkaRamp(Ramp, KafkaMixin):
         except ValueError as e:
             logger.exception(e)
 
-    def success(self, _id):
+    def success(self, message_id: str):
         """
         After a message has been successfully processed, commit the offset.
-        We always commit the oldest uncompleted offset for the partition, so that we don't skip any messages when processing is stopped and started again. Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition.
+        We always commit the oldest uncompleted offset for the partition, so that we don't skip any messages
+        when processing is stopped and started again.
+        Processing starts from the latest commited offset, so in our case it would start from the oldest uncompleted offset for the partition.
         """
-        logger.debug("Committing offset for %s", _id)
-        partition_number, offset = map(int, _id.split('-'))
+        partition_number, offset = self.parse_message_id(message_id)
+        if offset not in self.uncompleted_ids[partition_number]:
+            logger.warning("Offset %s not in uncompleted ids for partition %s", offset, partition_number)
+            return
         self.uncompleted_ids[partition_number].remove(offset)
         # commit the oldest offset
         oldest_offset = min(self.uncompleted_ids[partition_number]) if self.uncompleted_ids[partition_number] else offset + 1
-        self.consumer.commit(offsets=[TopicPartition(self.topic_name, partition_number, oldest_offset)], asynchronous=True)
+        if oldest_offset > self.commited_offsets[partition_number]:  # only commit if the offset is newer
+            self.commited_offsets[partition_number] = oldest_offset
+            topic_partition = TopicPartition(self.topic_name, partition_number, oldest_offset)
+            self.consumer.commit(offsets=[topic_partition], asynchronous=True)
+            logger.debug("Committing offset for topic %s: %s", self.topic_name, message_id)
+
+    def failed(self, message_id: str):
+        """
+        Log failed message processing and remove it from uncompleted_ids, so it doesn't block processing.
+
+        Override this method to implement custom failure handling logic like retrying or alerting.
+        """
+        partition_number, offset = self.parse_message_id(message_id)
+        if offset not in self.uncompleted_ids[partition_number]:
+            logger.warning('Failed message %s not found in uncompleted_ids', message_id)
+            return
+        self.uncompleted_ids[partition_number].remove(offset)
+        logger.warning('Message %s failed in %s', message_id, self.__class__.__name__)
 
     @staticmethod
     def on_assign(consumer, partitions):
@@ -175,5 +227,9 @@ class KafkaRamp(Ramp, KafkaMixin):
         logger.info("Partitions revoked:\n%s", "\n".join(formatted_partitions))
 
     def log_message_consumption(self, messages, current_iteration):
-        if len(messages) or current_iteration % 50 == 0:
+        if len(messages) or current_iteration % 100 == 0:
             logger.debug("Consumed %s messages from topic %s", len(messages), self.topic_name)
+
+    def logging_hook(self, current_iteration):
+        """Custom hook to override in the application invoked from the main consume loop."""
+        pass

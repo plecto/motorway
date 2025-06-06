@@ -39,7 +39,8 @@ class TestKafkaRamp(unittest.TestCase):
     def test_kafka_ramp_initialization(self):
         kafka_ramp = self.get_kafka_ramp()
 
-        kafka_ramp.consumer.subscribe.assert_called_once_with(['test_topic'])
+        kafka_ramp.consumer.subscribe.assert_called_once()
+        self.assertEquals(kafka_ramp.consumer.subscribe.call_args.args[0],['test_topic'])
         self.assertEquals(kafka_ramp.consumer.consume.call_count, 5)
 
     def test_consume_message(self):
@@ -103,13 +104,21 @@ class TestKafkaRamp(unittest.TestCase):
         # on the next iteration we will commit 4
         self.assert_commit_call_kwargs(commit, topic='test_topic', partition=0, offset=2)
 
+    def test_failed(self):
+        kafka_ramp = self.get_kafka_ramp(iterations=1)
+        kafka_ramp.uncompleted_ids[0].add(1)
+
+        kafka_ramp.failed('0-1')
+
+        self.assertFalse(kafka_ramp.uncompleted_ids[0])  # empty set
+
     @patch('motorway.contrib.kafka.utils.reinitialize_consumer_on_error', lambda x: x)
     def test_consume_throttle(self):
         class ThrottleException(Exception):
             pass
 
         kafka_ramp = self.get_kafka_ramp(iterations=0)
-        kafka_ramp.MAX_UNCOMPLETED_ITEMS = 2
+        kafka_ramp.MAX_UNCOMPLETED_ITEMS_PER_PARTITION = 2
         kafka_ramp._throttle = MagicMock(side_effect=ThrottleException)
         kafka_ramp.uncompleted_ids[0].update({1, 2})
         kafka_ramp.uncompleted_ids[1].update({3, 4, 5})
@@ -120,11 +129,45 @@ class TestKafkaRamp(unittest.TestCase):
 
     def test_consume_doesnt_throttle_below_limit(self):
         kafka_ramp = self.get_kafka_ramp(iterations=0)
-        kafka_ramp.MAX_UNCOMPLETED_ITEMS = 3
+        kafka_ramp.MAX_UNCOMPLETED_ITEMS_PER_PARTITION = 3
         kafka_ramp._throttle = MagicMock()
         kafka_ramp.uncompleted_ids[0].update({1, 2,})
         kafka_ramp.uncompleted_ids[1].update({3, 4, 5})
         kafka_ramp.uncompleted_ids[2].update({6, 7})
+
+        kafka_ramp.consume(iterations=1)
+
+        kafka_ramp._throttle.assert_not_called()
+
+    def test_consume_throttle_global_limit(self):
+        class ThrottleException(Exception):
+            pass
+
+        kafka_ramp = self.get_kafka_ramp(iterations=0)
+        kafka_ramp.MAX_UNCOMPLETED_ITEMS_PER_PARTITION = 5  # High enough to not trigger per-partition limit
+        kafka_ramp.MAX_TOTAL_UNCOMPLETED_ITEMS = 6  # Should trigger with 8 total items
+        kafka_ramp._throttle = MagicMock(side_effect=ThrottleException)
+        
+        # Add items across multiple partitions, but stay under per-partition limit
+        kafka_ramp.uncompleted_ids[0].update({1, 2})  # 2 items
+        kafka_ramp.uncompleted_ids[1].update({3, 4})  # 2 items
+        kafka_ramp.uncompleted_ids[2].update({5, 6, 7, 8})  # 4 items
+        # Total: 8 items > MAX_TOTAL_UNCOMPLETED_ITEMS (6)
+
+        with self.assertRaises(ThrottleException):
+            kafka_ramp.consume(iterations=1)
+
+    def test_consume_doesnt_throttle_below_global_limit(self):
+        kafka_ramp = self.get_kafka_ramp(iterations=0)
+        kafka_ramp.MAX_UNCOMPLETED_ITEMS_PER_PARTITION = 5  # High enough to not trigger per-partition limit
+        kafka_ramp.MAX_TOTAL_UNCOMPLETED_ITEMS = 10  # High enough to not trigger global limit
+        kafka_ramp._throttle = MagicMock()
+        
+        # Add items across multiple partitions, stay under both limits
+        kafka_ramp.uncompleted_ids[0].update({1, 2})  # 2 items
+        kafka_ramp.uncompleted_ids[1].update({3, 4})  # 2 items
+        kafka_ramp.uncompleted_ids[2].update({5, 6})  # 2 items
+        # Total: 6 items < MAX_TOTAL_UNCOMPLETED_ITEMS (10)
 
         kafka_ramp.consume(iterations=1)
 
