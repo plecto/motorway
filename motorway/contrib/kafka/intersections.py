@@ -83,7 +83,7 @@ class KafkaInsertIntersection(Intersection, KafkaMixin):
         If there's an error, retry or fail the message.
         """
         if err is not None:
-            logger.error(f"Delivery failed for record {record['message']}: {err}")
+            logger.error(f"Delivery error {err} for record {record['message']}")
             self.fail(record['message'])
         else:
             logger.debug(f"Message delivered to {msg.topic()} [{msg.partition()}] @ offset {msg.offset()}")
