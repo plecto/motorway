@@ -96,6 +96,13 @@ class ControllerIntersection(Intersection):
 
             # Create message or update with ack value
             if message.ramp_unique_id not in self.messages:  # Message just created
+                if message.content.get('msg_type') == 'new_msg':
+                    # A fresh delivery from a ramp of an id that previously failed (e.g.
+                    # re-delivered after a Kafka consumer-group rebalance) is a retry, not
+                    # a stale ack of the old attempt. Clear any blacklist entry so update()
+                    # doesn't silently drop it and leave the ramp waiting forever for a
+                    # reply it never receives (which pins that partition's committed offset).
+                    self.failed_messages.pop(message.ramp_unique_id, None)
                 assert message.producer_uuid, "Producer UUID missing from %s" % message._message()
                 self.messages[message.ramp_unique_id] = [
                     message.producer_uuid,
