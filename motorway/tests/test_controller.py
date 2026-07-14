@@ -154,5 +154,59 @@ class ControllerTestCase(TestCase):
         # self.assertEqual(self.controller.process_statistics[intersection_uuid]['avg_time_taken'], datetime.timedelta(seconds=15))
         self.assertEqual(self.controller.process_statistics[intersection_uuid]['total_frequency'], 1)
 
+    def _fail_message(self, ramp_uuid, intersection_uuid, unique_id):
+        """Create a message and then fail it, so its id lands on the blacklist."""
+        msg = Message(unique_id, "payload", producer_uuid=ramp_uuid)
+        msg.send_control_message(self.controller_sock, process_name=ramp_uuid, destination_uuid=intersection_uuid)
+        self.run_controller_process_method()
+        failing = Message.from_message(msg._message(), self.controller_sock, process_name=intersection_uuid)
+        failing.fail("boom", capture_exception=False)
+        self.run_controller_process_method()
+        return msg
+
+    def test_redelivered_failed_message_is_reprocessed(self):
+        # A message that failed (e.g. its worker disappeared during a scale-down) is
+        # blacklisted forever. When Kafka re-delivers the same offset after a rebalance it
+        # arrives with the same ramp_unique_id but as a fresh new_msg. It must be processed
+        # again, not silently swallowed - otherwise the ramp never gets a reply and that
+        # partition's committed offset stays pinned.
+        ramp_uuid = str(uuid.uuid4())
+        intersection_uuid = str(uuid.uuid4())
+        self._fail_message(ramp_uuid, intersection_uuid, 1337)
+        self.assertIn(1337, self.controller.failed_messages)
+        self.assertNotIn(1337, self.controller.messages)
+
+        # Re-delivery after a rebalance: same id, fresh new_msg from the ramp.
+        redelivered = Message(1337, "payload", producer_uuid=ramp_uuid)
+        redelivered.send_control_message(self.controller_sock, process_name=ramp_uuid, destination_uuid=intersection_uuid)
+        self.run_controller_process_method()
+
+        # Blacklist entry cleared and the message is tracked again, so update() won't drop it.
+        self.assertNotIn(1337, self.controller.failed_messages)
+        self.assertIn(1337, self.controller.messages)
+        self.controller.update()
+        self.run_controller_process_method()  # drain any pending removals
+        self.assertIn(1337, self.controller.messages)
+
+    def test_late_ack_after_failure_stays_swallowed(self):
+        # The blacklist's legitimate job is to drop late acks from other branches of a
+        # delivery that already failed. Those arrive as msg_type='ack', so retry-detection
+        # must not clear the blacklist for them - the dedup behaviour is preserved.
+        ramp_uuid = str(uuid.uuid4())
+        intersection_uuid = str(uuid.uuid4())
+        msg = self._fail_message(ramp_uuid, intersection_uuid, 1337)
+        self.assertIn(1337, self.controller.failed_messages)
+
+        # A late ack from another branch of the same (failed) delivery.
+        late_ack = Message.from_message(msg._message(), self.controller_sock, process_name=intersection_uuid)
+        late_ack.ack()
+        self.run_controller_process_method()
+
+        # Blacklist entry preserved, and the spuriously re-created entry is swept away.
+        self.assertIn(1337, self.controller.failed_messages)
+        self.controller.update()
+        self.run_controller_process_method()  # drain failed_message_queue
+        self.assertNotIn(1337, self.controller.messages)
+
 
 
